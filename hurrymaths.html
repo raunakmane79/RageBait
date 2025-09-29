@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RageBait Quiz — Shifty Prompt ⏳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#10131a; --line:#1a2230;
+    --ink:#f3f5fb; --muted:#aab0c0;
+    --accent:#7c5cff; --warn:#ff4e73; --good:#7cffb3; --bad:#ffb870;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink);
+    background:radial-gradient(1200px 800px at 20% -10%, #151a26, #0b0c10);
+    display:flex; flex-direction:column;
+  }
+  header{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, #121726, #0b0c10);
+  }
+  .brand{font-weight:900; letter-spacing:.02em}
+  .hud{display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-weight:700; font-size:.95rem}
+  .hud span{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1220}
+  .timerbar{
+    position:relative; height:8px; background:#0f1220; overflow:hidden;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .timerbar .fill{
+    position:absolute; left:0; top:0; bottom:0; width:100%;
+    background:linear-gradient(90deg, var(--warn), var(--accent));
+    transform-origin:left center; transform:scaleX(1);
+    transition:transform .15s linear;
+  }
+  main{flex:1; display:grid; place-items:center; padding:24px}
+  .card{
+    width:min(860px, 92vw);
+    background:#0f1322; border:1px solid var(--line); border-radius:22px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.05);
+    padding:28px;
+  }
+  .problem{
+    display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    font-size:clamp(28px, 6vw, 56px); font-weight:900; letter-spacing:.01em;
+  }
+  .ghost{
+    font-size:clamp(14px,2.4vw,18px); color:var(--muted);
+    opacity:.0; transform:translateY(-6px);
+    transition:opacity .35s var(--ease), transform .35s var(--ease);
+  }
+  .ghost.show{opacity:.85; transform:translateY(0)}
+  .glitch{
+    position:relative; display:inline-block;
+  }
+  .glitch.mutate{
+    animation:gl 320ms steps(2,end);
+    text-shadow: 1px 0 var(--warn), -1px 0 var(--accent);
+  }
+  @keyframes gl{
+    0%{transform:translate(0,0)} 30%{transform:translate(1px,-1px)} 60%{transform:translate(-1px,1px)} 100%{transform:translate(0,0)}
+  }
+  .row{display:flex; gap:12px; align-items:center; margin-top:20px; flex-wrap:wrap}
+  input[type="number"]{
+    width:200px; padding:12px 14px; font-size:20px; font-weight:800; letter-spacing:.03em;
+    color:var(--ink); background:#0d1120; border:2px solid #182035; border-radius:14px;
+    outline:none; transition:border-color .2s var(--ease), transform .1s var(--ease);
+  }
+  input[type="number"]:focus{border-color:var(--accent); transform:translateY(-1px)}
+  .btn{
+    padding:12px 16px; border-radius:14px; font-weight:900; letter-spacing:.02em; cursor:pointer;
+    border:1px solid var(--line); background:#0f1322; color:var(--ink); transition:.2s var(--ease);
+  }
+  .btn.primary{
+    background:linear-gradient(135deg, var(--accent), var(--warn));
+    color:white; border:none; box-shadow:0 16px 36px rgba(124,92,255,.28);
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .note{color:var(--muted); margin-top:10px; font-size:.95rem}
+  .toast{
+    margin-top:14px; font-weight:800; color:var(--muted);
+    opacity:0; transform:translateY(-6px); transition:.25s var(--ease);
+  }
+  .toast.show{opacity:1; transform:translateY(0)}
+  footer{
+    padding:12px 16px; text-align:center; color:var(--muted); border-top:1px solid var(--line); background:#0b0c10
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 12px; border-radius:999px; border:1px dashed var(--line); color:var(--muted);
+    font-weight:700; font-size:.9rem;
+  }
+  .toggle{appearance:none; width:42px; height:24px; border-radius:999px; background:#1a2134; position:relative; outline:none; cursor:pointer; border:1px solid var(--line)}
+  .toggle:before{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#99a2bd; transition:.2s var(--ease)}
+  .toggle:checked{background:#2b2350}
+  .toggle:checked:before{left:20px; background:#d7c7ff}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🔥 RageBait Quiz</div>
+  <div class="hud">
+    <span>Round: <b id="round">1/10</b></span>
+    <span>Score: <b id="score">0</b></span>
+    <span>Mutations: <b id="muts">0</b></span>
+    <span class="pill"><input id="mean" type="checkbox" class="toggle"> Mean Mode</span>
+  </div>
+</header>
+
+<div class="timerbar"><div class="fill" id="bar"></div></div>
+
+<main>
+  <div class="card">
+    <div class="problem">
+      <span id="txt" class="glitch">2 + 2 = ?</span>
+      <span id="ghost" class="ghost"></span>
+    </div>
+
+    <div class="row">
+      <input id="answer" type="number" inputmode="numeric" placeholder="Type answer…" />
+      <button id="submit" class="btn primary">Submit ↵</button>
+      <button id="next" class="btn">Skip / Next</button>
+    </div>
+
+    <div id="toast" class="toast">Ready? The clock’s ticking…</div>
+    <div class="note">Tip: The problem may “shift” after you start typing. It’s not you. Probably. 🙂</div>
+  </div>
+</main>
+
+<footer>
+  Designed to be fair… ish. Time pressure + subtle problem tweaks = delicious doubt.
+</footer>
+
+<script>
+(() => {
+  const txt = document.getElementById('txt');
+  const ghost = document.getElementById('ghost');
+  const ans = document.getElementById('answer');
+  const submit = document.getElementById('submit');
+  const nextBtn = document.getElementById('next');
+  const toast = document.getElementById('toast');
+  const roundEl = document.getElementById('round');
+  const scoreEl = document.getElementById('score');
+  const mutsEl = document.getElementById('muts');
+  const bar = document.getElementById('bar');
+  const meanToggle = document.getElementById('mean');
+
+  const ROUNDS = 10;
+  const BASE_TIME = 14; // seconds
+  const MEAN_TIME = 10;
+
+  let state = {
+    round: 1,
+    score: 0,
+    time: BASE_TIME,
+    timerId: null,
+    started: false,
+    lastTypeAt: 0,
+    mutateCount: 0,
+    firstTyped: false,
+    question: null,
+    running: true,
+    mutateCooldown: 0
+  };
+
+  function randi(a,b){ return Math.floor(a + Math.random()*(b-a+1)); }
+
+  function makeQuestion(){
+    // Keep it simple (+ / -), always integer and non-negative for subtraction
+    const ops = ['+','-','+','+']; // bias towards plus
+    let op = ops[(Math.random()*ops.length)|0];
+    let a = randi(1,9), b = randi(1,9);
+    if (op==='-' && a<b){ [a,b] = [b,a]; }
+    const ans = (op==='+')? a+b : a-b;
+    return {a,b,op,ans};
+  }
+
+  function render(q, prevText=""){
+    const s = `${q.a} ${q.op} ${q.b} = ?`;
+    txt.textContent = s;
+    // tiny glitch pulse
+    txt.classList.remove('mutate');
+    void txt.offsetWidth; // reflow to restart animation
+    txt.classList.add('mutate');
+
+    if (prevText){
+      ghost.textContent = `was: ${prevText}`;
+      ghost.classList.add('show');
+      clearTimeout(render._t);
+      render._t = setTimeout(()=> ghost.classList.remove('show'), 1100);
+    }
+  }
+
+  function setToast(t){
+    toast.textContent = t;
+    toast.classList.add('show');
+    clearTimeout(setToast._t);
+    setToast._t = setTimeout(()=> toast.classList.remove('show'), 1200);
+  }
+
+  function startTimer(){
+    clearInterval(state.timerId);
+    const total = state.time;
+    let left = total;
+    bar.style.transform = 'scaleX(1)';
+    const startedAt = performance.now();
+    state.timerId = setInterval(()=>{
+      const elapsed = (performance.now()-startedAt)/1000;
+      left = Math.max(0, total - elapsed);
+      const p = left/total;
+      bar.style.transform = `scaleX(${p.toFixed(4)})`;
+      if (left<=0){
+        clearInterval(state.timerId);
+        setToast(`Time’s up! It mutated ${state.mutateCount}×.`);
+        state.running = false;
+        setTimeout(nextRound, 700);
+      }
+    }, 50);
+  }
+
+  function resetRound(){
+    state.time = meanToggle.checked ? MEAN_TIME : BASE_TIME;
+    state.mutateCount = 0;
+    state.firstTyped = false;
+    state.running = true;
+    ans.value = '';
+    ans.focus({ preventScroll:true });
+    mutsEl.textContent = '0';
+    ghost.classList.remove('show');
+    const q = makeQuestion();
+    state.question = q;
+    render(q);
+    startTimer();
+    setToast('Go!');
+  }
+
+  function nextRound(){
+    if (state.round >= ROUNDS){
+      // end screen
+      txt.textContent = `Final Score: ${state.score}/${ROUNDS}`;
+      ghost.textContent = '';
+      ans.disabled = true; submit.disabled = true;
+      setToast('You survived the shifty quiz.');
+      return;
+    }
+    state.round++;
+    roundEl.textContent = `${state.round}/${ROUNDS}`;
+    resetRound();
+  }
+
+  function mutateQuestion(kind='nudge'){
+    if (!state.running) return;
+    const prev = `${state.question.a} ${state.question.op} ${state.question.b} = ?`;
+    const q = {...state.question};
+
+    const roll = Math.random();
+    if (kind==='flip' || roll<0.2){
+      // flip operator; ensure non-negative subtraction
+      q.op = (q.op==='+')? '-' : '+';
+      if (q.op==='-' && q.a<q.b) [q.a,q.b] = [q.b,q.a];
+    } else {
+      // nudge an operand by ±1..2, clamp 0..12
+      if (Math.random()<0.5){
+        q.a = Math.max(0, Math.min(12, q.a + (Math.random()<0.5? -1:1)*(meanToggle.checked?2:1)));
+        if (q.op==='-' && q.a<q.b) [q.a,q.b] = [q.b,q.a];
+      } else {
+        q.b = Math.max(0, Math.min(12, q.b + (Math.random()<0.5? -1:1)*(meanToggle.checked?2:1)));
+        if (q.op==='-' && q.a<q.b) [q.a,q.b] = [q.b,q.a];
+      }
+    }
+    q.ans = (q.op==='+')? (q.a+q.b) : (q.a-q.b);
+    state.question = q;
+    state.mutateCount++;
+    mutsEl.textContent = String(state.mutateCount);
+    render(q, prev);
+  }
+
+  function maybeMutateOnType(){
+    const now = performance.now();
+    // First keystroke: immediate slight change
+    if (!state.firstTyped){
+      state.firstTyped = true;
+      mutateQuestion('nudge');
+      setToast('…did that just change?');
+      state.mutateCooldown = now + 350; // small grace
+      return;
+    }
+    // Ongoing: if they keep typing, occasionally flip things
+    const interval = meanToggle.checked ? 550 : 900;
+    if (now > state.mutateCooldown){
+      if (Math.random() < (meanToggle.checked ? 0.7 : 0.45)){
+        mutateQuestion(Math.random()<0.35 ? 'flip' : 'nudge');
+      }
+      state.mutateCooldown = now + interval;
+    }
+  }
+
+  // Handlers
+  ans.addEventListener('input', () => {
+    if (!state.running) return;
+    maybeMutateOnType();
+  });
+
+  submit.addEventListener('click', () => {
+    if (!state.running) return;
+    const v = Number(ans.value.trim());
+    if (Number.isNaN(v)) { setToast('Enter a number!'); return; }
+    const correct = v === state.question.ans;
+    if (correct){
+      state.score++; scoreEl.textContent = String(state.score);
+      setToast(['Lucky!','Nice catch.','Clutched it.'][randi(0,2)]);
+    } else {
+      setToast(['Close… but it moved.','Not quite.','It shifted on you, huh?'][randi(0,2)]);
+    }
+    state.running = false;
+    clearInterval(state.timerId);
+    setTimeout(nextRound, 600);
+  });
+
+  nextBtn.addEventListener('click', () => {
+    state.running = false; clearInterval(state.timerId);
+    setToast('Skipping…');
+    setTimeout(nextRound, 350);
+  });
+
+  // Keyboard: Enter to submit
+  window.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter'){ submit.click(); }
+  }, {passive:true});
+
+  // Init
+  resetRound();
+})();
+</script>
+</body>
+</html>

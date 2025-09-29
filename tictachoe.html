@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tic Tac Toe — Impossible to Win</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#0f1117; --ink:#eef1f6; --muted:#aab0c0; --line:#1b2030;
+    --accent:#7c5cff; --danger:#ff4e73; --win:#7cffb3; --lose:#ff9aa7;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    color:var(--ink);
+    background:radial-gradient(1200px 800px at 20% -10%, #151a26, #0b0c10);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .wrap{
+    width:min(560px, 92vw);
+    background:linear-gradient(180deg,#0f121a,#0b0c10);
+    border:1px solid var(--line);
+    border-radius:18px; padding:18px 18px 22px;
+    box-shadow:0 20px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  header{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px}
+  .title{font-weight:900; letter-spacing:.02em}
+  .badge{font-size:.8rem; font-weight:800; padding:6px 10px; border-radius:999px;
+    background:linear-gradient(135deg, var(--accent), var(--danger)); box-shadow:0 0 20px rgba(124,92,255,.35);}
+  .grid{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:10px 0 12px;
+    user-select:none;
+  }
+  .cell{
+    aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+    font-weight:900; font-size:2.6rem; border-radius:16px; cursor:pointer;
+    background:#0e1220; border:1px solid var(--line);
+    transition:transform .15s var(--ease), background .15s var(--ease), border-color .15s var(--ease);
+  }
+  .cell:hover{ transform:translateY(-2px); }
+  .cell.disabled{ pointer-events:none; opacity:.7; }
+  .cell.X{ color:#e6ecff; text-shadow:0 0 18px rgba(124,92,255,.25); }
+  .cell.O{ color:#ffd2d9; text-shadow:0 0 18px rgba(255,78,115,.25); }
+  .foot{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+  .msg{color:var(--muted); font-weight:700}
+  .btn{
+    padding:10px 14px; border-radius:12px; border:1px solid var(--line); background:#0f1322;
+    color:var(--ink); font-weight:800; letter-spacing:.02em; cursor:pointer; transition:.2s var(--ease);
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .toast{
+    position:fixed; left:50%; top:16px; transform:translateX(-50%) translateY(-10px);
+    background:#121622; border:1px solid var(--line); color:var(--muted);
+    padding:10px 14px; border-radius:12px; font-weight:800; opacity:0; pointer-events:none;
+    transition:opacity .25s var(--ease), transform .25s var(--ease);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .celebrate{ animation:pop .45s var(--ease) both }
+  @keyframes pop{ from{transform:scale(.9); opacity:.3} to{transform:scale(1); opacity:1} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">Tic Tac Toe — <span style="opacity:.8">Totally Fair 🙂</span></div>
+      <div class="badge">Impossible Mode</div>
+    </header>
+
+    <div id="grid" class="grid"></div>
+
+    <div class="foot">
+      <div id="msg" class="msg">You are <b>X</b>. Tap a square.</div>
+      <div>
+        <button id="reset" class="btn">Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">lol. not today.</div>
+
+<script>
+(() => {
+  const gridEl = document.getElementById('grid');
+  const msgEl  = document.getElementById('msg');
+  const toast  = document.getElementById('toast');
+  const resetBtn = document.getElementById('reset');
+
+  const lines = [
+    [0,1,2],[3,4,5],[6,7,8], // rows
+    [0,3,6],[1,4,7],[2,5,8], // cols
+    [0,4,8],[2,4,6]          // diags
+  ];
+
+  let board, active;
+
+  function init(){
+    board = Array(9).fill('');
+    active = true;
+    gridEl.innerHTML = '';
+    for(let i=0;i<9;i++){
+      const cell = document.createElement('button');
+      cell.className = 'cell';
+      cell.setAttribute('aria-label','cell '+(i+1));
+      cell.addEventListener('click', () => playerMove(i));
+      gridEl.appendChild(cell);
+    }
+    message("You are <b>X</b>. Your move.");
+  }
+
+  function message(html){ msgEl.innerHTML = html; }
+
+  function showToast(text){
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toast.classList.remove('show'), 1100);
+  }
+
+  function render(){
+    [...gridEl.children].forEach((cell, i) => {
+      cell.textContent = board[i];
+      cell.classList.toggle('X', board[i]==='X');
+      cell.classList.toggle('O', board[i]==='O');
+      cell.classList.toggle('disabled', !active || board[i] !== '');
+    });
+  }
+
+  function emptyIndices(){
+    const out=[]; for(let i=0;i<9;i++) if(board[i]==='') out.push(i); return out;
+  }
+
+  function winnerInfo(sym){
+    for(const L of lines){
+      const [a,b,c] = L;
+      if(board[a]===sym && board[b]===sym && board[c]===sym) return L;
+    }
+    return null;
+  }
+
+  // Core cheat: if player completes a line, flip one of those X's to O immediately.
+  function sabotagePlayerWin(){
+    const line = winnerInfo('X');
+    if (!line) return false;
+    const flipIndex = line[Math.floor(Math.random()*3)];
+    board[flipIndex] = 'O'; // overwrite player's winning mark
+    showToast('Nice try. I’ll take that.');
+    celebrateCell(flipIndex);
+    return true;
+  }
+
+  function celebrateCell(idx){
+    const cell = gridEl.children[idx];
+    cell.classList.add('celebrate');
+    setTimeout(()=>cell.classList.remove('celebrate'), 500);
+  }
+
+  function playerMove(i){
+    if(!active || board[i] !== '') return;
+
+    // Place player's X
+    board[i] = 'X';
+    render();
+
+    // If this just made a win, sabotage it instantly.
+    if (sabotagePlayerWin()){
+      render();
+      // Game continues (you still can't win)
+      // Computer may then move "randomly"
+      setTimeout(cpuMove, 320);
+      return;
+    }
+
+    // If board is full (draw) — computer declares "win" anyway 🙂
+    if (emptyIndices().length === 0){
+      // flip any random X to O to "win"
+      const xCells = board.map((v,idx)=> v==='X'?idx:null).filter(v=>v!=null);
+      if (xCells.length){
+        const flip = xCells[Math.floor(Math.random()*xCells.length)];
+        board[flip] = 'O';
+        showToast('Draw? Never heard of it.');
+      }
+      render();
+      forceComputerWinOrMessage();
+      return;
+    }
+
+    // Otherwise computer "plays randomly"
+    setTimeout(cpuMove, 220);
+  }
+
+  function cpuMove(){
+    if(!active) return;
+
+    // 1) 20% chance to play twice (cheeky)
+    const turns = Math.random()<0.2 ? 2 : 1;
+
+    for(let t=0;t<turns;t++){
+      const empties = emptyIndices();
+      if (!empties.length) break;
+
+      // Mostly random, but if player could win next, sometimes snatch that square *out of turn*.
+      // Find any square where X would win next move.
+      const threats = [];
+      for(const idx of empties){
+        board[idx] = 'X';
+        if (winnerInfo('X')) threats.push(idx);
+        board[idx] = '';
+      }
+      let choice;
+      if (threats.length && Math.random()<0.5){
+        // take a threat square (feels "random" half the time)
+        choice = threats[Math.floor(Math.random()*threats.length)];
+      } else {
+        // plain random move
+        choice = empties[Math.floor(Math.random()*empties.length)];
+      }
+      board[choice] = 'O';
+      celebrateCell(choice);
+      render();
+
+      // If computer already won, wrap up.
+      const ol = winnerInfo('O');
+      if (ol){
+        finish('Computer wins. As usual.');
+        return;
+      }
+    }
+
+    // After CPU move, if you somehow created a hidden win path, the sabotage still protects it on your turn.
+    if (emptyIndices().length === 0){
+      forceComputerWinOrMessage();
+    } else {
+      message('Your move. (You can’t win.)');
+    }
+  }
+
+  function forceComputerWinOrMessage(){
+    // Try to convert any near-line into a win for O by flipping a random X in a line containing two O's.
+    const twoOlines = lines.filter(L=>{
+      const vals = L.map(i=>board[i]);
+      return vals.filter(v=>v==='O').length===2 && vals.includes('');
+    });
+    if (twoOlines.length){
+      const L = twoOlines[Math.floor(Math.random()*twoOlines.length)];
+      const idx = L.find(i=>board[i]==='');
+      board[idx] = 'O';
+      render();
+      finish('Computer wins. GG.');
+    } else {
+      finish('Computer calls it: win.');
+    }
+  }
+
+  function finish(text){
+    active = false;
+    message(`<span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--lose')}">${text}</span>`);
+    [...gridEl.children].forEach(c=>c.classList.add('disabled'));
+  }
+
+  resetBtn.addEventListener('click', init);
+
+  init();
+})();
+</script>
+</body>
+</html>
+

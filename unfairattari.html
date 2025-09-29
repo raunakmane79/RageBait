@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unfair Atari — Retro Paddle Rage</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#10131b; --line:#1b2230;
+    --ink:#eef1f6; --muted:#aab0c0;
+    --accent:#7c5cff; --danger:#ff4e73; --good:#7cffb3; --bad:#ffb870;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink);
+    background:radial-gradient(1200px 800px at 20% -10%, #151a26, #0b0c10);
+    display:flex; flex-direction:column;
+  }
+  header{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    padding:12px 16px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, #111522, #0b0c10);
+  }
+  .brand{font-weight:900; letter-spacing:.02em}
+  .hud{display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-weight:700; font-size:.95rem}
+  .hud span{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1220}
+  #stage{position:relative; flex:1; overflow:hidden; border-top:1px solid var(--line)}
+  canvas{display:block; width:100%; height:100%}
+  .toast{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%) translateY(-8px);
+    background:#121622; border:1px solid var(--line); color:var(--muted);
+    padding:10px 14px; border-radius:12px; font-weight:800; opacity:0; pointer-events:none;
+    transition:opacity .25s var(--ease), transform .25s var(--ease);
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .controls{
+    position:absolute; bottom:12px; left:0; right:0; display:flex; justify-content:center; gap:10px;
+  }
+  .btn{
+    padding:10px 14px; border-radius:12px; border:1px solid var(--line); background:#0f1322;
+    color:var(--ink); font-weight:800; letter-spacing:.02em; cursor:pointer; transition:.2s var(--ease);
+  }
+  .btn:hover{transform:translateY(-2px)}
+  footer{padding:10px 14px; text-align:center; color:var(--muted); border-top:1px solid var(--line); background:#0b0c10}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🕹️ Unfair Atari</div>
+  <div class="hud">
+    <span>Mode: <b id="mode">Normal</b></span>
+    <span>Timer: <b id="timer">00:00</b></span>
+    <span>Score — You: <b id="pScore">0</b> • CPU: <b id="cScore">0</b></span>
+    <span id="status">Ready</span>
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="game"></canvas>
+  <div id="toast" class="toast">lol. not today.</div>
+  <div class="controls">
+    <button id="restart" class="btn">Restart</button>
+  </div>
+</div>
+
+<footer>
+  Starts nice. Then it learns dirty tricks. You cannot win. Have fun 🙂
+</footer>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const toast = document.getElementById('toast');
+  const restartBtn = document.getElementById('restart');
+  const modeEl = document.getElementById('mode');
+  const timerEl = document.getElementById('timer');
+  const pScoreEl = document.getElementById('pScore');
+  const cScoreEl = document.getElementById('cScore');
+  const statusEl = document.getElementById('status');
+
+  let W=0,H=0,dpr=Math.max(1,window.devicePixelRatio||1);
+  function resize(){
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.floor(W*dpr); canvas.height = Math.floor(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize, {passive:true});
+  resize();
+
+  const G = {
+    startTime: performance.now(),
+    unfairAt: 12000, // ms until cheats begin
+    unfair: false,
+    invertUntil: 0,
+    shakeUntil: 0,
+    walls: [],
+    powerups: [],
+    lastPower: 0,
+    pointsToWin: 7 // not that you'll get there…
+  };
+
+  const PADDLE = {
+    w: 12, h: 100, x: 30, y: 0, vy: 0, speed: 9,
+    minH: 35
+  };
+  const CPU = {
+    w: 12, h: 100, x: 0, y: 0, vy: 0, speed: 7
+  };
+  CPU.x = W - 30 - CPU.w;
+
+  const BALL = {
+    x: W/2, y: H/2, r: 8, vx: 6, vy: 3.2, base: 6
+  };
+
+  let pScore=0,cScore=0, running=true;
+
+  function resetPositions(centerKick = true){
+    PADDLE.y = (H - PADDLE.h)/2;
+    CPU.y = (H - CPU.h)/2;
+    BALL.x = W/2; BALL.y = H/2;
+    const dir = Math.random()<0.5? -1: 1;
+    BALL.vx = dir*(BALL.base + (Math.random()*2-1));
+    BALL.vy = (Math.random()*2-1) * (BALL.base*0.6);
+  }
+
+  function showToast(t){
+    toast.textContent = t;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toast.classList.remove('show'), 1200);
+  }
+
+  // Controls: mouse/touch track paddle; keyboard arrows/W/S
+  let pointerY = null;
+  canvas.addEventListener('mousemove', e=>{
+    const r = canvas.getBoundingClientRect();
+    pointerY = e.clientY - r.top;
+  });
+  canvas.addEventListener('mouseleave', ()=> pointerY=null);
+  canvas.addEventListener('touchstart', e=>{
+    const t = e.touches[0], r=canvas.getBoundingClientRect();
+    pointerY = t.clientY - r.top;
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e=>{
+    const t = e.touches[0], r=canvas.getBoundingClientRect();
+    pointerY = t.clientY - r.top;
+  }, {passive:true});
+
+  const keys = new Set();
+  window.addEventListener('keydown', e=>{
+    keys.add(e.key.toLowerCase());
+  }, {passive:true});
+  window.addEventListener('keyup', e=>{
+    keys.delete(e.key.toLowerCase());
+  }, {passive:true});
+
+  restartBtn.addEventListener('click', ()=>{
+    pScore=cScore=0; G.unfair=false; G.walls=[]; G.powerups=[];
+    PADDLE.h=100; CPU.h=100; BALL.base=6; PADDLE.speed=9; CPU.speed=7;
+    G.startTime = performance.now(); running=true; statusEl.textContent='Ready';
+    resetPositions(true);
+  });
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+
+  function drawBG(){
+    ctx.fillStyle='#0b0c10'; ctx.fillRect(0,0,W,H);
+    // center dashed line
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=2; ctx.setLineDash([8,14]);
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawPaddle(x,y,w,h,color){
+    ctx.fillStyle=color;
+    ctx.fillRect(x,y,w,h);
+  }
+
+  function drawBall(){
+    ctx.beginPath(); ctx.arc(BALL.x,BALL.y,BALL.r,0,Math.PI*2);
+    ctx.fillStyle='#e6ecff'; ctx.fill();
+  }
+
+  function updateTimer(){
+    const t = Math.floor((performance.now()-G.startTime)/1000);
+    const mm = String(Math.floor(t/60)).padStart(2,'0');
+    const ss = String(t%60).padStart(2,'0');
+    timerEl.textContent = `${mm}:${ss}`;
+  }
+
+  // Random unfair events
+  function spawnWall(){
+    const wh = 60 + Math.random()*120;
+    const wy = Math.random()*(H - wh);
+    const wx = W*0.35 + Math.random()*W*0.3;
+    const vy = (Math.random()<0.5? -1:1) * (1 + Math.random()*1.5);
+    G.walls.push({x:wx,y:wy,w:14,h:wh,vy});
+  }
+
+  function spawnBadPowerup(){
+    const px = W*0.25 + Math.random()*W*0.5;
+    const py = 30 + Math.random()*(H-60);
+    const types = ['shrink','invert','speed','ghost']; // all bad for player
+    const type = types[(Math.random()*types.length)|0];
+    G.powerups.push({x:px,y:py,r:10,type,vy:(Math.random()<0.5? -1:1)*0.8});
+  }
+
+  function drawWallsAndPowerups(){
+    // Walls
+    ctx.fillStyle='#1a2233';
+    for(const w of G.walls){
+      w.y += w.vy;
+      if (w.y<0 || w.y+w.h>H) w.vy*=-1;
+      ctx.fillRect(w.x,w.y,w.w,w.h);
+      // collide with ball
+      if (BALL.x+BALL.r > w.x && BALL.x-BALL.r < w.x+w.w && BALL.y+BALL.r > w.y && BALL.y-BALL.r < w.y+w.h){
+        BALL.vx*=-1.03; BALL.x += BALL.vx*1.5; // kick away
+        cameraShake(150);
+      }
+    }
+    // Powerups (evil)
+    for (let i=G.powerups.length-1;i>=0;i--){
+      const p = G.powerups[i];
+      p.y += p.vy;
+      if (p.y<p.r || p.y>H-p.r) p.vy*=-1;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle = p.type==='invert' ? '#ffb870' : '#ff4e73';
+      ctx.fill();
+      // pickup by player paddle
+      if (circleRect(BALL.r, p.x,p.y, PADDLE.x,PADDLE.y,PADDLE.w,PADDLE.h)){ // fake: tie to paddle area
+        applyBadEffect(p.type);
+        G.powerups.splice(i,1);
+        showToast(badLabel(p.type));
+      }
+    }
+  }
+
+  function badLabel(t){
+    return {
+      shrink: 'Paddle diet activated.',
+      invert: 'Controls inverted!',
+      speed: 'Ball turbo x1.5!',
+      ghost: 'Ball ghosts through your paddle… sometimes.'
+    }[t] || 'lol';
+  }
+
+  function applyBadEffect(t){
+    if (t==='shrink') PADDLE.h = Math.max(PADDLE.minH, PADDLE.h*0.7);
+    if (t==='invert') G.invertUntil = performance.now()+3000;
+    if (t==='speed'){ BALL.base*=1.5; BALL.vx*=1.2; BALL.vy*=1.2; }
+    if (t==='ghost'){ // mark a short window where player paddle has holes
+      PADDLE.ghostUntil = performance.now()+4500;
+    }
+  }
+
+  function circleRect(r,cx,cy, rx,ry,rw,rh){
+    const nx = clamp(cx, rx, rx+rw);
+    const ny = clamp(cy, ry, ry+rh);
+    return ( (cx-nx)**2 + (cy-ny)**2 ) <= r*r;
+  }
+
+  function cameraShake(ms){
+    G.shakeUntil = performance.now()+ms;
+  }
+
+  function unfairLogic(now){
+    if (!G.unfair && (now - G.startTime) >= G.unfairAt){
+      G.unfair = true; modeEl.textContent='Unfair'; statusEl.textContent='Good luck.';
+      showToast('Unfair Mode: ON');
+      CPU.h = 160; CPU.speed = 999; // tracks perfectly
+    }
+    // Spawn random grief
+    if (G.unfair){
+      if (Math.random()<0.005) spawnWall();
+      if (now - G.lastPower > 2000 && Math.random()<0.4){
+        spawnBadPowerup();
+        G.lastPower = now;
+      }
+      // Occasionally invert automatically
+      if (Math.random()<0.002) { G.invertUntil = now + 2000; showToast('Inverted!'); }
+    }
+  }
+
+  function update(){
+    const now = performance.now();
+    updateTimer();
+    unfairLogic(now);
+
+    // Player control
+    let dir = 0;
+    const inv = (G.invertUntil>now)? -1 : 1;
+    if (pointerY!=null){
+      // smooth follow towards pointer
+      const target = pointerY - PADDLE.h/2;
+      const dy = target - PADDLE.y;
+      PADDLE.y += clamp(dy, -PADDLE.speed, PADDLE.speed) * inv;
+    } else {
+      if (keys.has('arrowup') || keys.has('w')) dir -= 1;
+      if (keys.has('arrowdown') || keys.has('s')) dir += 1;
+      PADDLE.y += dir * PADDLE.speed * inv;
+    }
+    PADDLE.y = clamp(PADDLE.y, 0, H - PADDLE.h);
+
+    // CPU AI: fair before unfair, perfect tracking after
+    const targetY = BALL.y - CPU.h/2 + (G.unfair ? 0 : (Math.sin(now/260)*24));
+    const diff = targetY - CPU.y;
+    const aiSpeed = G.unfair ? CPU.speed : clamp(diff, -CPU.speed, CPU.speed);
+    CPU.y += clamp(diff, -Math.abs(aiSpeed), Math.abs(aiSpeed));
+    CPU.y = clamp(CPU.y, 0, H - CPU.h);
+
+    // Ball physics
+    BALL.x += BALL.vx; BALL.y += BALL.vy;
+    if (BALL.y-BALL.r<0 || BALL.y+BALL.r>H) { BALL.vy*=-1; BALL.y = clamp(BALL.y, BALL.r, H-BALL.r); }
+
+    // Paddle collisions (player)
+    const playerGhost = G.unfair && PADDLE.ghostUntil && (now < PADDLE.ghostUntil) && (Math.random()<0.35);
+    if (!playerGhost && BALL.x-BALL.r <= PADDLE.x+PADDLE.w && BALL.y > PADDLE.y && BALL.y < PADDLE.y+PADDLE.h && BALL.vx<0){
+      BALL.vx = Math.abs(BALL.vx)*1.05;
+      const off = (BALL.y - (PADDLE.y+PADDLE.h/2)) / (PADDLE.h/2);
+      BALL.vy += off*2.4;
+      cameraShake(80);
+    }
+
+    // Paddle collisions (CPU) — teleport or perfect reflect in unfair mode
+    if (BALL.x+BALL.r >= CPU.x && BALL.y > CPU.y && BALL.y < CPU.y+CPU.h && BALL.vx>0){
+      if (G.unfair && Math.random()<0.7){
+        // teleport slightly to guarantee reflect
+        BALL.y = clamp(CPU.y + CPU.h/2 + (Math.random()*40-20), BALL.r, H-BALL.r);
+      }
+      BALL.vx = -Math.abs(BALL.vx)*1.07;
+      const off = (BALL.y - (CPU.y+CPU.h/2)) / (CPU.h/2);
+      BALL.vy += off*2.6;
+      cameraShake(80);
+    }
+
+    // Scoring
+    if (BALL.x < -BALL.r){
+      // CPU scores (normal)
+      cScore++; cScoreEl.textContent=cScore; scoreTaunt(false);
+      resetPositions();
+    } else if (BALL.x > W+BALL.r){
+      // Player would score… but in Unfair Mode we flip it to CPU.
+      if (G.unfair){
+        cScore++; cScoreEl.textContent=cScore;
+        showToast('Goal flipped. Thanks for the point!');
+        statusEl.textContent='The house always wins.';
+      } else {
+        pScore++; pScoreEl.textContent=pScore;
+        statusEl.textContent='Nice shot!';
+      }
+      resetPositions();
+    }
+
+    // “Win” conditions (blocked for player)
+    if (cScore >= G.pointsToWin && running){
+      running=false; showToast('CPU wins. As expected.'); statusEl.textContent='CPU wins.';
+    }
+    if (pScore >= G.pointsToWin && running){
+      if (G.unfair){
+        // convert to CPU instant win anyway
+        cScore = G.pointsToWin; cScoreEl.textContent=cScore;
+        running=false; showToast('Nope. CPU claims victory.'); statusEl.textContent='Ref decision: CPU.';
+      } else {
+        // Before unfair mode, allow brief hope then instantly enable unfair + steal win
+        G.unfair = true; modeEl.textContent='Unfair'; statusEl.textContent='Ref review… overturned.';
+        cScore = G.pointsToWin; cScoreEl.textContent=cScore; running=false;
+      }
+    }
+  }
+
+  function scoreTaunt(playerScored){
+    if (playerScored) showToast('You got lucky.');
+    else showToast(['Too slow.','Outplayed.','Try blinking less.'][Math.floor(Math.random()*3)]);
+  }
+
+  function draw(){
+    // camera shake
+    if (performance.now() < G.shakeUntil){
+      const dx = (Math.random()*6-3), dy=(Math.random()*6-3);
+      ctx.save(); ctx.translate(dx,dy);
+      drawFrame();
+      ctx.restore();
+    } else {
+      drawFrame();
+    }
+  }
+
+  function drawFrame(){
+    drawBG();
+    // Scores
+    ctx.fillStyle='rgba(255,255,255,.09)';
+    ctx.font='900 64px Inter, system-ui, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(String(pScore), W*0.25, 10);
+    ctx.fillText(String(cScore), W*0.75, 10);
+
+    // Entities
+    drawPaddle(PADDLE.x,PADDLE.y,PADDLE.w,PADDLE.h,'#e6ecff');
+    drawPaddle(CPU.x,CPU.y,CPU.w,CPU.h,'#ffd2d9');
+    drawBall();
+    drawWallsAndPowerups();
+
+    // Mode badge
+    modeEl.textContent = G.unfair ? 'Unfair' : 'Normal';
+  }
+
+  function loop(){
+    if (running){ update(); }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // init sizes based on canvas box
+  function fit(){
+    const r = canvas.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = Math.floor(W*dpr); canvas.height = Math.floor(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    CPU.x = W - 30 - CPU.w;
+    resetPositions(true);
+  }
+  window.addEventListener('resize', fit, {passive:true});
+  fit();
+  loop();
+})();
+</script>
+</body>
+</html>
+ 

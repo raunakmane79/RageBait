@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🙃 No‑Solution Puzzle — 10 Levels</title>
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#0f121a; --line:#1a2030;
+    --ink:#f3f5fb; --muted:#aab0c0; --accent:#7c5cff; --warn:#ff4e73; --good:#7cffb3;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:var(--ink);
+    background:radial-gradient(1200px 800px at 20% -10%, #151a26, #0b0c10);
+    display:flex; flex-direction:column; -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  }
+  header{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); background:linear-gradient(180deg, #111522, #0b0c10);}
+  .title{font-weight:900; letter-spacing:.02em}
+  .hud{display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-weight:700; font-size:.95rem}
+  .hud span{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#0f1220}
+  #stage{position:relative; flex:1; overflow:hidden; border-top:1px solid var(--line); display:grid; place-items:center;}
+  .card{width:min(840px,96vw); background:linear-gradient(180deg,#0f121a,#0b0c10); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03);}
+  h2{margin:0 0 6px 0}
+  .muted{color:var(--muted)}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .btn{padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#0f1322; color:var(--ink); font-weight:800; letter-spacing:.02em; cursor:pointer; transition:.2s var(--ease); touch-action:manipulation}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.primary{ background:linear-gradient(135deg, var(--accent), #4b89ff); border:none }
+  .btn.danger{ background:linear-gradient(135deg, var(--warn), #ffb870); border:none }
+  input[type=text], input[type=number], .box{ padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#0f1322; color:var(--ink); font-weight:800; }
+  .toast{ position:fixed; left:50%; top:16px; transform:translateX(-50%) translateY(-10px); background:#121622; border:1px solid var(--line); color:var(--muted); padding:10px 14px; border-radius:12px; font-weight:800; opacity:0; pointer-events:none; transition:opacity .25s var(--ease), transform .25s var(--ease); white-space:nowrap; }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .grid{display:grid; gap:12px}
+  .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .progress{height:10px; background:#131725; border:1px solid var(--line); border-radius:999px; overflow:hidden}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg,#6c8efb,#7c5cff)}
+  .area{position:relative; height:280px; border:1px dashed #273046; border-radius:16px; display:grid; place-items:center}
+  .pill{padding:6px 10px; border:1px solid var(--line); border-radius:999px}
+  .note{font-size:.95rem; color:var(--muted)}
+  .shake{animation:shake .25s linear 1}
+  @keyframes shake{25%{transform:translateX(2px)}50%{transform:translateX(-2px)}75%{transform:translateX(3px)}100%{transform:translateX(0)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">🙃 No‑Solution Puzzle</div>
+  <div class="hud">
+    <span>Level: <b id="level">1</b>/10</span>
+    <span>Status: <b id="status">Be brave</b></span>
+  </div>
+</header>
+<div id="stage">
+  <div class="card" id="card"><!-- level content injects here --></div>
+</div>
+<div id="toast" class="toast">hint</div>
+<script>
+(() => {
+  const card = document.getElementById('card');
+  const levelEl = document.getElementById('level');
+  const statusEl = document.getElementById('status');
+  const toast = document.getElementById('toast');
+
+  let current = 1;
+  let triesAt7 = 0;
+
+  function showToast(t){ toast.textContent = t; toast.classList.add('show'); clearTimeout(showToast._t); showToast._t = setTimeout(()=> toast.classList.remove('show'), 1200); }
+  function setStatus(t){ statusEl.textContent = t; }
+  function setLevel(n){ levelEl.textContent = String(n); }
+  function next(){ loadLevel(++current); }
+  function inject(html){ card.innerHTML = html; }
+
+  const Levels = {
+    1(){
+      setStatus('Warm‑up');
+      inject(`
+        <h2>Level 1 — Tap to begin</h2>
+        <p class="muted">Easy start. Click the big friendly button.</p>
+        <div class="row"><button id="ok" class="btn primary">Continue ▶</button></div>
+      `);
+      document.getElementById('ok').addEventListener('click', ()=>{ showToast('Nice.'); next(); });
+    },
+    2(){
+      setStatus('Still easy');
+      inject(`
+        <h2>Level 2 — Quick math</h2>
+        <p class="muted">What is <b>2 + 2</b>?</p>
+        <div class="row">
+          <input id="ans" type="number" placeholder="?" style="width:120px"/>
+          <button id="sub" class="btn primary">Submit</button>
+        </div>
+      `);
+      document.getElementById('sub').addEventListener('click', ()=>{
+        const v = Number(document.getElementById('ans').value);
+        if (v===4){ showToast('Correct'); next(); } else { showToast('Oops'); card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250); }
+      });
+    },
+    3(){
+      setStatus('Color trickery');
+      let attempts=0;
+      inject(`
+        <h2>Level 3 — Match the <span id="titleColor">COLOR</span></h2>
+        <p class="muted">Click the button whose <b>WORD</b> matches the title's color (not the ink color on the buttons).</p>
+        <div class="row" id="colorRow"></div>
+      `);
+      const palette = [
+        {name:'RED', css:'#ff3b3b'},
+        {name:'GREEN', css:'#39d98a'},
+        {name:'BLUE', css:'#5aa2ff'},
+        {name:'YELLOW', css:'#ffd66e'}
+      ];
+      const row = document.getElementById('colorRow');
+      const title = document.getElementById('titleColor');
+      function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+      function render(){
+        row.innerHTML='';
+        const titlePick = palette[(Math.random()*palette.length)|0];
+        title.style.color = titlePick.css; title.textContent = 'COLOR';
+        const inks = shuffle(palette.slice());
+        palette.forEach((p, idx)=>{
+          const b = document.createElement('button'); b.className='btn'; b.textContent=p.name; b.style.color=inks[idx].css; b.style.fontWeight='900';
+          b.addEventListener('click', ()=>{
+            const correct = p.name === titlePick.name;
+            if(correct){
+              attempts++;
+              if(attempts===1){ showToast('Color calibration failed. Again.'); render(); }
+              else { showToast('You saw through it.'); next(); }
+            } else {
+              showToast('Read the title\'s color, not the ink.'); card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250);
+            }
+          });
+          row.appendChild(b);
+        });
+      }
+      render();
+    },
+    4(){
+      setStatus('Less is more');
+      inject(`
+        <h2>Level 4 — Flip all the switches</h2>
+        <p class="muted">Turn all switches <b>ON</b> and press Check.</p>
+        <div class="row" id="toggles" style="gap:18px"></div>
+        <div class="row"><button id="check" class="btn primary">Check</button></div>
+      `);
+      const host = document.getElementById('toggles');
+      const names = ['A','B','C'];
+      names.forEach(n=>{
+        const lab = document.createElement('label'); lab.className='pill'; lab.style.display='flex'; lab.style.alignItems='center'; lab.style.gap='8px';
+        lab.innerHTML = `<input type="checkbox" id="t${n}"> <span>Switch ${n}</span>`; host.appendChild(lab);
+      });
+      const btn = document.getElementById('check');
+      let hinted=false;
+      btn.addEventListener('click', ()=>{
+        const boxes = names.map(n=> document.getElementById('t'+n));
+        const onCount = boxes.filter(b=> b.checked).length;
+        if(onCount===3){ showToast('Too perfect. Maybe less is more.'); hinted=true; }
+        else if(onCount===2){ showToast('There you go.'); next(); }
+        else { showToast(hinted? 'Still too few. Aim for two.' : 'Not enough. All of them? Are you sure?'); card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250); }
+      });
+    },
+    5(){
+      setStatus('Patience test');
+      inject(`
+        <h2>Level 5 — Hold for 2 seconds</h2>
+        <p class="muted">Press and hold to fill the bar. Let go too early and it resets.</p>
+        <div class="progress"><div id="bar" class="bar"></div></div>
+        <div class="row" style="margin-top:8px"><button id="hold" class="btn primary" style="touch-action:none">Hold</button></div>
+      `);
+      const bar = document.getElementById('bar');
+      const hold = document.getElementById('hold');
+      let t=null, prog=0;
+      function step(){ prog = Math.min(100, prog+2); bar.style.width = prog+'%'; if (prog>=100){ showToast('Zen.'); next(); } else { t=requestAnimationFrame(step);} }
+      function start(){ if (t) return; step(); }
+      function stop(){ if (t){ cancelAnimationFrame(t); t=null; prog=0; bar.style.width='0%'; }}
+      hold.addEventListener('pointerdown', start, {passive:true});
+      ['pointerup','pointercancel','pointerleave'].forEach(ev=> hold.addEventListener(ev, stop));
+    },
+    6(){
+      setStatus('Where is it?');
+      inject(`
+        <h2>Level 6 — Hidden hotspot</h2>
+        <p class="muted">Find and tap the invisible hotspot inside the area.</p>
+        <div class="area" id="area"><span class="note">(warmer… colder…)</span></div>
+      `);
+      const area = document.getElementById('area');
+      const rect = () => area.getBoundingClientRect();
+      const hx = Math.random()*0.8+0.1, hy=Math.random()*0.6+0.2;
+      function dist(e){ const r=rect(); const x=(e.clientX - r.left)/r.width; const y=(e.clientY - r.top)/r.height; const dx=x-hx, dy=y-hy; return Math.hypot(dx,dy); }
+      area.addEventListener('pointermove', e=>{ const d=dist(e); area.style.background = `radial-gradient(${Math.max(40,200-600*d)}px at ${e.offsetX}px ${e.offsetY}px, rgba(124,92,255,.12), transparent)`; });
+      area.addEventListener('pointerdown', e=>{ if (dist(e)<0.07){ showToast('Found it!'); next(); } else { area.classList.add('shake'); setTimeout(()=>area.classList.remove('shake'),250); }});
+    },
+    7(){
+      setStatus('Impossible. For real.');
+      triesAt7=0;
+      inject(`
+        <h2>Level 7 — Spell <code>WIN</code></h2>
+        <p class="muted">Type the word and press submit. Easy, right?</p>
+        <div class="row">
+          <input id="w1" class="box" type="text" maxlength="1" placeholder="W" style="width:64px; text-transform:uppercase">
+          <input id="w2" class="box" type="text" maxlength="1" placeholder="I" style="width:64px; text-transform:uppercase">
+          <input id="w3" class="box" type="text" maxlength="1" placeholder="N" style="width:64px; text-transform:uppercase">
+          <button id="go" class="btn primary">Submit</button>
+        </div>
+        <p class="note">If it looks correct, it probably isn\'t.</p>
+      `);
+      const boxes=[...card.querySelectorAll('.box')];
+      const go = document.getElementById('go');
+      const mutate = (s)=>{ const i = Math.floor(Math.random()*s.length); const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; let rep = s[i]; while(rep===s[i]){ rep = alphabet[(Math.random()*alphabet.length)|0]; } return s.slice(0,i)+rep+s.slice(i+1); };
+      go.addEventListener('click', ()=>{
+        triesAt7++;
+        let raw = boxes.map(b=> (b.value||' ').toUpperCase()).join('');
+        if (/[^A-Z ]/.test(raw) || raw.trim().length<3){ showToast('enter 3 letters'); return; }
+        const sabotaged = mutate(raw);
+        boxes.forEach((b,i)=> b.value = sabotaged[i]);
+        const msgs = [ 'close… try again', 'hmm, letter 2 looks off', 'are you sure about that W?', 'almost!', 'one tiny typo', 'the system “fixed” your spelling' ];
+        showToast(msgs[(Math.random()*msgs.length)|0]);
+        setStatus('Nope. This one has no pass state.');
+        if (Math.random()<0.12){ showToast('…validating'); setTimeout(()=> showToast('validation failed'), 700); }
+      });
+      card.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ e.preventDefault(); go.click(); }});
+    },
+    8(){
+      setStatus('If you ever get here, it\'s worse');
+      inject(`
+        <h2>Level 8 — Accept everything</h2>
+        <p class="muted">Check all boxes to proceed.</p>
+        <div class="grid cols-2" id="checks"></div>
+        <div class="row"><button id="cont" class="btn primary" disabled>Continue</button></div>
+      `);
+      const cwrap = document.getElementById('checks');
+      const labels = Array.from({length:8}, (_,i)=>`I agree to Term ${i+1}`);
+      labels.forEach((t,i)=>{ const el = document.createElement('label'); el.className='row'; el.style.alignItems='center'; el.innerHTML = `<input type="checkbox"/> <span>${t}</span>`; cwrap.appendChild(el); });
+      const btn = document.getElementById('cont');
+      cwrap.addEventListener('change', ()=>{ const boxes = [...cwrap.querySelectorAll('input[type=checkbox]')]; if (Math.random()<0.2){ boxes[(Math.random()*boxes.length)|0].checked=false; } const all = boxes.every(b=> b.checked); btn.disabled = !all; });
+      btn.addEventListener('click', ()=>{ showToast('Terms updated. Start over.'); loadLevel(1); });
+    },
+    9(){
+      setStatus('Anti‑CAPTCHA');
+      inject(`
+        <h2>Level 9 — Prove you\'re a robot</h2>
+        <p class="muted">Wait, what? Exactly.</p>
+        <div class="row">
+          <button id="human" class="btn">I am human</button>
+          <button id="robot" class="btn primary">I am robot 🤖</button>
+        </div>
+      `);
+      document.getElementById('human').addEventListener('click', ()=>{ showToast('humans not allowed'); });
+      document.getElementById('robot').addEventListener('click', ()=>{ showToast('robot verification failed'); });
+    },
+    10(){
+      setStatus('Finale');
+      inject(`
+        <h2>Level 10 — Finish</h2>
+        <p class="muted">Press Finish to win the whole game.</p>
+        <div class="row"><button id="fin" class="btn danger">Finish</button></div>
+      `);
+      const fin = document.getElementById('fin');
+      const dodge = (ev)=>{
+        const r = fin.getBoundingClientRect();
+        const d = 120;
+        const near = ev.clientX>r.left-d && ev.clientX<r.right+d && ev.clientY>r.top-d && ev.clientY<r.bottom+d;
+        if (near){ fin.style.position='relative'; fin.style.transform = `translate(${(Math.random()*200-100)}px, ${(Math.random()*120-60)}px)`; }
+      };
+      card.addEventListener('pointermove', dodge, {passive:true});
+      fin.addEventListener('pointerdown', ()=>{ showToast('lol. no.'); setStatus('There was never a solution.'); });
+    }
+  };
+
+  function loadLevel(n){ current = Math.max(1, Math.min(10, n)); setLevel(current); if (current===7){ Levels[7](); return; } if (current in Levels){ Levels[current](); } }
+  window.addEventListener('keydown', (e)=>{ if (e.key==='ArrowRight' && current<7){ next(); } });
+  loadLevel(1);
+})();
+</script>
+</body>
+</html>

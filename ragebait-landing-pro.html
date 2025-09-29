@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RageBait — Unfair Mini‑Arcade</title>
+  <meta name="description" content="RageBait: a slick landing page for six unfair mini‑games. Starts chill, ends evil." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0b0f; --bg2:#111117; --ink:#f4f4f6; --muted:#c7c7d1; --line:#1c1c22;
+      --accent:#ff5470; --accent2:#7c5cff; --ok:#00d68f; --warn:#ffcb2b; --bad:#ff3b30;
+      --glow: drop-shadow(0 0 18px rgba(255,84,112,.45));
+      --panel:#0f1016;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      background:radial-gradient(1200px 800px at 10% -10%, #1d1d29 0%, rgba(29,29,41,0) 70%),
+                 radial-gradient(1000px 700px at 110% 10%, #1a1429 0%, rgba(26,20,41,0) 60%),
+                 linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      overflow-x:hidden; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .fog{position:fixed; inset:-20vmax; pointer-events:none; filter:blur(60px) saturate(120%); opacity:.35;
+         mix-blend-mode:screen; z-index:0; background:conic-gradient(from 45deg at 50% 50%,
+         #ff547033, #7c5cff33, #00d68f33, #ffcb2b33, #ff547033); animation:fog 18s linear infinite}
+    @keyframes fog{0%{transform:rotate(0) scale(1)} 50%{transform:rotate(180deg) scale(1.05)} 100%{transform:rotate(360deg) scale(1)}}
+    .scanlines{position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.07; background:repeating-linear-gradient(180deg,#000 0 1px,transparent 1px 3px)}
+
+    header{position:sticky; top:0; z-index:10; backdrop-filter:saturate(140%) blur(10px);
+            background:linear-gradient(180deg, rgba(20,20,28,.8), rgba(20,20,28,.35)); border-bottom:1px solid var(--line)}
+    .nav{max-width:1200px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 20px}
+    .logo{font-weight:900; letter-spacing:.02em; font-size:1.15rem; display:flex; align-items:center; gap:.6rem}
+    .logo-badge{width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent2));
+      display:grid; place-items:center; filter:var(--glow);}
+    .logo-badge span{font-family:"JetBrains Mono", monospace; font-weight:700; font-size:.9rem}
+    .nav a{color:var(--muted); text-decoration:none; font-weight:600; font-size:.95rem}
+    .nav-cta{padding:10px 14px; background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d;
+      border-radius:12px; font-weight:900; letter-spacing:.02em; box-shadow:0 8px 20px rgba(124,92,255,.25); transition:transform .12s ease}
+    .nav-cta:active{transform:translateY(1px)}
+
+    .hero{position:relative; max-width:1200px; margin:0 auto; padding:8vh 20px 6vh; display:grid; grid-template-columns:1.1fr .9fr; gap:32px; align-items:center}
+    @media (max-width: 900px){ .hero{grid-template-columns:1fr; padding:10vh 20px 6vh} }
+    .kicker{display:inline-flex; gap:.6rem; align-items:center; padding:8px 12px; border:1px dashed #2a2a33; border-radius:999px; color:var(--muted); font-size:.85rem; margin-bottom:16px}
+    .kicker i{display:inline-block; width:8px; height:8px; background:var(--bad); border-radius:50%; box-shadow:0 0 14px var(--bad)}
+    .title{font-size:clamp(2.4rem, 5vw, 4.2rem); line-height:1.05; font-weight:900; letter-spacing:-.02em; margin:0 0 10px; position:relative}
+    .title .glitch{position:relative; display:inline-block}
+    .title .glitch::before, .title .glitch::after{content:attr(data-text); position:absolute; left:0; top:0; clip-path:polygon(0 0,100% 0,100% 45%,0 45%); mix-blend-mode:screen; filter:drop-shadow(0 0 6px rgba(255,84,112,.45))}
+    .title .glitch::before{transform:translate(2px,-1px); color:#ff5470}
+    .title .glitch::after{transform:translate(-2px,1px); color:#7c5cff}
+    .sub{color:var(--muted); font-size:1.1rem; max-width:52ch; margin:12px 0 22px}
+    .cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
+    .cta{padding:14px 18px; border-radius:14px; font-weight:900; letter-spacing:.02em; text-decoration:none; display:inline-flex; align-items:center; gap:.6rem}
+    .cta.primary{background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d; box-shadow:0 10px 28px rgba(124,92,255,.25), inset 0 -2px 0 rgba(0,0,0,.25)}
+    .cta.ghost{border:1px solid #2a2a33; color:var(--muted); backdrop-filter:blur(6px)}
+
+    .teaser{position:relative; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:linear-gradient(180deg, #0f0f16, #0a0a0f); box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    .teaser canvas{display:block; width:100%; height:360px; background:#0d0d14}
+    @media (max-width: 900px){ .teaser canvas{height:240px} }
+    .ribbon{position:absolute; top:12px; left:12px; font-family:"JetBrains Mono", monospace; font-size:.8rem; color:#111; background:var(--warn); padding:6px 10px; border-radius:999px}
+
+    /* Arcade grid */
+    .arcade{max-width:1200px; margin:0 auto; padding:20px 20px 80px}
+    .row-head{display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 14px}
+    .row-head h2{margin:0; font-size:1.3rem; letter-spacing:.01em}
+    .grid{display:grid; grid-template-columns:repeat( auto-fit, minmax(260px, 1fr)); gap:14px}
+    .card{border:1px solid var(--line); border-radius:16px; padding:14px; background:linear-gradient(180deg,#101522,#0e111a);
+           box-shadow:0 16px 50px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03); display:flex; flex-direction:column; gap:10px;
+           transition:transform .18s ease, border-color .2s ease}
+    .card:hover{ transform:translateY(-2px); border-color:#2a2a33}
+    .card-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .card-title{margin:0; font-size:1.05rem; letter-spacing:.01em}
+    .card-text{margin:0; color:var(--muted)}
+    .chip{padding:6px 10px; border:1px solid var(--line); border-radius:999px; background:#0f1322; color:var(--muted); white-space:nowrap; font-weight:800; font-size:.8rem}
+    .actions{display:flex; gap:8px; margin-top:2px; flex-wrap:wrap}
+    .btn{appearance:none; text-decoration:none; cursor:pointer; user-select:none;
+         padding:10px 12px; border-radius:12px; border:1px solid var(--line);
+         background:#0f1322; color:var(--ink); font-weight:800; letter-spacing:.02em;
+         display:inline-flex; align-items:center; justify-content:center; gap:8px; transition:.18s ease}
+    .btn:hover{transform:translateY(-2px)}
+    .btn:active{transform:translateY(0) scale(.98)}
+    .btn.primary{border:none; color:#fff; background:linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow:0 10px 24px rgba(124,92,255,.35), inset 0 -2px 0 rgba(0,0,0,.25)}
+    .btn.ghost{background:#0f1322}
+
+    .meter{height:8px; background:#12121a; border:1px solid #2a2a33; border-radius:999px; overflow:hidden}
+    .meter>i{display:block; height:100%; width:20%; background:linear-gradient(90deg, var(--accent), var(--accent2)); box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+
+    /* CTA band */
+    .band{position:relative; margin:30px 0; background:linear-gradient(90deg, #181822, #12121a); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+    .band-inner{max-width:1200px; margin:0 auto; padding:22px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap}
+    .pill{display:inline-flex; align-items:center; gap:.5rem; padding:8px 12px; border-radius:999px; border:1px dashed #2a2a33; color:var(--muted); font-size:.9rem}
+
+    footer{border-top:1px solid var(--line); background:#0a0a10}
+    .foot{max-width:1200px; margin:0 auto; padding:32px 20px; display:flex; justify-content:space-between; gap:16px; color:var(--muted); font-size:.95rem; flex-wrap:wrap}
+    .foot a{color:var(--muted); text-decoration:none}
+
+    /* Accessibility focus */
+    :focus{outline:2px solid var(--accent2); outline-offset:2px}
+  </style>
+</head>
+<body>
+  <div class="fog" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header>
+    <nav class="nav" aria-label="Main">
+      <div class="logo" role="img" aria-label="RageBait logo">
+        <div class="logo-badge"><span>RB</span></div>
+        RageBait
+      </div>
+      <div style="display:flex; align-items:center; gap:16px">
+        <a href="#arcade">Games</a>
+        <a href="#how">How it works</a>
+        <a class="nav-cta" href="#" id="playRandomTop">Play Random</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="how">
+      <div>
+        <div class="kicker"><i></i> Early chaos build • 1.0.0</div>
+        <h1 class="title">
+          <span class="glitch" data-text="RageBait">RageBait</span>
+          — Where games play <em>you</em>
+        </h1>
+        <p class="sub">One landing page. Six unfair mini‑games. Starts friendly, then misbehaves. Tap “Play Random” for instant chaos or pick your poison below.</p>
+        <div class="cta-row">
+          <a class="cta primary" href="#arcade" id="scrollToArcade">Choose a game ↓</a>
+          <a class="cta ghost" href="#" id="playRandomHero">Play Random →</a>
+          <span class="pill">⚠️ Contains joy + anger</span>
+        </div>
+      </div>
+
+      <aside class="teaser" aria-label="Chaos teaser">
+        <span class="ribbon">100% Unfair</span>
+        <canvas id="chaos"></canvas>
+      </aside>
+    </section>
+
+    <section class="arcade" id="arcade">
+      <div class="row-head">
+        <h2>Arcade</h2>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <a class="btn" href="ragebait-landing-pro.html" download>⤓ Download this page</a>
+          <a class="btn primary" href="#" id="playRandom">▶ Play Random</a>
+        </div>
+      </div>
+
+      <div class="grid">
+        
+          <article class="card" data-file="crazydino.html">
+            <header class="card-top">
+              <h3 class="card-title">Smooth… then Sus (Dino Runner)</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">Looks fair. Gets shady. Jump with Space / Tap.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="crazydino.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="crazydino.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+
+          <article class="card" data-file="tictachoe.html">
+            <header class="card-top">
+              <h3 class="card-title">Tic Tac Toe — Impossible</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">It celebrates its wins. A lot. You? Not so much.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="tictachoe.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="tictachoe.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+
+          <article class="card" data-file="unfair tetris.html">
+            <header class="card-top">
+              <h3 class="card-title">Unfair Tetris</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">Blocks spawn where you *don’t* want them. Of course.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="unfair tetris.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="unfair tetris.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+
+          <article class="card" data-file="UnfairArrows.html">
+            <header class="card-top">
+              <h3 class="card-title">RageBait Darts</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">Target “teleports” right before you land a hit.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="UnfairArrows.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="UnfairArrows.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+
+          <article class="card" data-file="unfairattari.html">
+            <header class="card-top">
+              <h3 class="card-title">Unfair Atari</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">Retro vibes. New ways to lose.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="unfairattari.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="unfairattari.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+
+          <article class="card" data-file="word guesser.html">
+            <header class="card-top">
+              <h3 class="card-title">Glitchy Word Guesser</h3>
+              <span class="chip">Unfair</span>
+            </header>
+            <p class="card-text">Spelling? Optional. The UI lies a little.</p>
+            <div class="meter" aria-label="Chaos level"><i></i></div>
+            <div class="actions">
+              <a class="btn primary" href="word guesser.html" target="_blank" rel="noopener">▶ Play</a>
+              <a class="btn ghost" href="word guesser.html" download>⤓ Download</a>
+            </div>
+          </article>
+        
+      </div>
+
+      <div class="band" style="margin-top:24px">
+        <div class="band-inner">
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+            <span class="pill">🧪 Playtest build</span>
+            <span class="pill">🤝 Invite a friend to suffer</span>
+            <span class="pill">⌨️ Keyboard: Space / ↑ / ← → • 📱 Touch: Tap</span>
+          </div>
+          <a class="cta primary" href="#" id="playRandomBottom">Surprise me</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="foot">
+      <div>© <span id="year"></span> RageBait. All rights undeserved.</div>
+      <div style="display:flex; gap:14px; align-items:center">
+        <a href="#">Terms*</a>
+        <a href="#">Privacy**</a>
+        <a href="#">Support?</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Chaos canvas background (particles bouncing with mischievous rules)
+    const canvas = document.getElementById('chaos');
+    const ctx = canvas.getContext('2d');
+    const DPR = Math.min(2, window.devicePixelRatio || 1);
+    const resize = () => { canvas.width = canvas.clientWidth * DPR; canvas.height = canvas.clientHeight * DPR; };
+    const balls = [];
+    function initBalls(N=36){ 
+      balls.length = 0;
+      for(let i=0;i<N;i++){
+        balls.push({
+          x: Math.random()*canvas.width,
+          y: Math.random()*canvas.height,
+          vx: (Math.random()*2-1)*(1+Math.random()*1.5),
+          vy: (Math.random()*2-1)*(1+Math.random()*1.5),
+          r: 5 + Math.random()*8,
+          h: Math.random()*360
+        });
+      }
+    }
+    function tick(){
+      ctx.fillStyle = '#0b0b10';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      balls.forEach(b=>{
+        const chaos = Math.sin(Date.now()/700 + b.x*0.001);
+        b.vy += (chaos>0? .04 : -.02);
+        b.vx += (Math.random()-.5)*0.02;
+        b.x += b.vx; b.y += b.vy;
+        const pad = 4*DPR;
+        let left=pad, right=canvas.width-pad, top=pad, bottom=canvas.height-pad;
+        if(Math.random()>.996){ left+=40; right-=40; top+=20; bottom-=20; }
+        if(b.x < left || b.x > right){ b.vx*=-1; b.x = Math.max(left, Math.min(right, b.x)); }
+        if(b.y < top || b.y > bottom){ b.vy*=-1; b.y = Math.max(top, Math.min(bottom, b.y)); }
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r*3);
+        g.addColorStop(0, `hsla(${b.h}, 95%, 60%, .95)`);
+        g.addColorStop(1, `hsla(${b.h}, 95%, 60%, 0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r*3, 0, Math.PI*2); ctx.fill();
+      });
+      requestAnimationFrame(tick);
+    }
+    const doResize = () => { resize(); initBalls(); };
+    window.addEventListener('resize', doResize);
+    doResize(); tick();
+
+    // Smooth scroll
+    document.getElementById('scrollToArcade').addEventListener('click', (e)=>{
+      e.preventDefault(); document.getElementById('arcade').scrollIntoView({behavior:'smooth'});
+    });
+
+    // "Play Random" opens a random game in a new tab
+    const gameFiles = ["crazydino.html", "tictachoe.html", "unfair tetris.html", "UnfairArrows.html", "unfairattari.html", "word guesser.html"];
+    function playRandom(){ 
+      const pick = gameFiles[Math.floor(Math.random()*gameFiles.length)];
+      window.open(pick, '_blank', 'noopener');
+    }
+    ;['playRandom','playRandomTop','playRandomHero','playRandomBottom'].forEach(id=>{
+      const el = document.getElementById(id); if(el) el.addEventListener('click', (e)=>{ e.preventDefault(); playRandom(); });
+    });
+
+    // Animate chaos meters on cards
+    document.querySelectorAll('.card .meter i').forEach(i=>{
+      const w = 12 + Math.random()*78;
+      i.style.width = w + '%';
+    });
+
+    // Respect reduced motion
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      document.querySelector('.fog').style.animation = 'none';
+    }
+  </script>
+</body>
+</html>

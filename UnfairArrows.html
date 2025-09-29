@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RageBait Darts — Sudden Blink</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0b0f; --ink:#f4f4f6; --muted:#aeb0bf; --line:#1b1d27;
+    --accent:#ff4e73; --accent2:#7c5cff; --good:#7cff8c; --bad:#ffb84e;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    color:var(--ink); background: radial-gradient(1200px 800px at 20% -10%, #151824, #0b0b0f);
+    display:flex; flex-direction:column;
+  }
+  header{
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    display:flex; gap:12px; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg, #10121b, #0b0b0f);
+  }
+  .brand{font-weight:900; letter-spacing:.02em}
+  .badge{
+    font-size:.8rem; font-weight:700; padding:6px 10px; border-radius:999px;
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    box-shadow:0 0 20px rgba(124,92,255,.35); white-space:nowrap;
+  }
+  .hud{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    color:var(--muted); font-size:.95rem;
+  }
+  .hud span{padding:6px 10px; border:1px solid var(--line); border-radius:10px; background:#10121a}
+  #game{
+    flex:1; position:relative; overflow:hidden; border-top:1px solid var(--line);
+  }
+  canvas{display:block; width:100%; height:100%}
+  .toast{
+    position:absolute; left:50%; top:16px; transform:translateX(-50%);
+    background:#121418; border:1px solid var(--line); color:var(--muted);
+    padding:10px 14px; border-radius:12px; font-weight:700; opacity:0;
+    transition:opacity .25s var(--ease), transform .25s var(--ease);
+    pointer-events:none; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(6px)}
+  .controls{
+    position:absolute; inset:auto 0 14px 0; display:flex; justify-content:center; gap:12px; pointer-events:none;
+  }
+  .btn{
+    pointer-events:auto;
+    padding:12px 16px; border-radius:14px; font-weight:900; letter-spacing:.02em;
+    background:transparent; color:var(--ink); border:2px solid var(--accent2); cursor:pointer;
+    transition:.25s var(--ease); box-shadow:inset 0 0 0 0 rgba(255,255,255,.1);
+  }
+  .btn.primary{
+    background:linear-gradient(135deg, var(--accent), var(--accent2));
+    border:none; color:white; box-shadow:0 10px 24px rgba(124,92,255,.35), inset 0 -2px 0 rgba(0,0,0,.2);
+  }
+  .btn:hover{transform:translateY(-3px) scale(1.02)}
+  .btn:active{transform:scale(.98)}
+  .hint{
+    position:absolute; right:12px; top:64px; color:var(--muted); font-size:.85rem; opacity:.8;
+    padding:8px 10px; background:#0e1016; border:1px dashed var(--line); border-radius:10px;
+  }
+  footer{
+    padding:10px 14px; text-align:center; color:var(--muted); font-size:.85rem; border-top:1px solid var(--line);
+    background:#0b0b0f;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">🔥 RageBait Darts</div>
+    <div class="hud">
+      <span>Accuracy: <strong id="acc">0%</strong></span>
+      <span>Hits: <strong id="hits">0</strong></span>
+      <span>Misses: <strong id="miss">0</strong></span>
+      <span class="badge">Sudden Blink Mode</span>
+    </div>
+  </header>
+
+  <div id="game">
+    <canvas id="canvas"></canvas>
+    <div class="hint">Stable target… until the last second 😈</div>
+    <div id="toast" class="toast">blink.</div>
+    <div class="controls">
+      <button id="throwBtn" class="btn primary">Throw Dart</button>
+      <button id="shuffleBtn" class="btn">Recenter Target</button>
+    </div>
+  </div>
+
+  <footer>
+    Think you’ve got it lined up? That’s when it disappears.
+  </footer>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const toast = document.getElementById('toast');
+  const throwBtn = document.getElementById('throwBtn');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+  const accEl = document.getElementById('acc');
+  const hitsEl = document.getElementById('hits');
+  const missEl = document.getElementById('miss');
+
+  let W = 0, H = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+  function resize(){
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize, { passive:true });
+  resize();
+
+  const state = {
+    cursor: { x: W/2, y: H/2, active:false },
+    darts: [],
+    stats: { shots:0, hits:0, misses:0 },
+    target: {
+      x: W*0.7, y: H*0.4, r: 36,
+      moveTo(x,y){ this.x=x; this.y=y; },
+      moveToRandom(pad=60){
+        const nx = pad + Math.random()*(W - pad*2);
+        const ny = pad + Math.random()*(H - pad*2);
+        this.x = nx; this.y = ny;
+      }
+    }
+  };
+  const T = state.target;
+
+  // Place target once; stable until a dart nearly hits
+  T.moveTo(W*0.7, H*0.4);
+
+  // Inputs
+  function setCursor(x,y){
+    const rect = canvas.getBoundingClientRect();
+    state.cursor.x = Math.max(0, Math.min(W, x - rect.left));
+    state.cursor.y = Math.max(0, Math.min(H, y - rect.top));
+    state.cursor.active = true;
+  }
+  canvas.addEventListener('mousemove', e => setCursor(e.clientX, e.clientY));
+  canvas.addEventListener('mouseleave', () => state.cursor.active = false);
+  canvas.addEventListener('touchstart', e => { const t=e.touches[0]; setCursor(t.clientX, t.clientY); fire(); }, { passive:true });
+  canvas.addEventListener('touchmove', e => { const t=e.touches[0]; setCursor(t.clientX, t.clientY); }, { passive:true });
+
+  throwBtn.addEventListener('click', fire);
+  shuffleBtn.addEventListener('click', () => { T.moveTo(W*0.7, H*0.4); taunt("Target reset"); });
+
+  function fire(){
+    state.stats.shots++;
+    const start = { x: W/2, y: H - 30 };
+    const targetPoint = { x: state.cursor.x, y: state.cursor.y };
+    const angle = Math.atan2(targetPoint.y - start.y, targetPoint.x - start.x);
+    const speed = 12 + Math.random()*2;
+
+    state.darts.push({
+      x: start.x, y: start.y,
+      vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+      life: 0, maxLife: 120, tip: 8
+    });
+  }
+
+  function taunt(text){
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(taunt._t);
+    taunt._t = setTimeout(()=> toast.classList.remove('show'), 1000);
+  }
+
+  // Utility
+  function dist(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return Math.hypot(dx,dy); }
+
+  function drawBackground(){
+    ctx.fillStyle = '#0b0b0f';
+    ctx.fillRect(0,0,W,H);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,.04)';
+    const step = 32;
+    ctx.beginPath();
+    for(let x=0;x<W;x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+    for(let y=0;y<H;y+=step){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+    ctx.stroke();
+  }
+
+  function drawTarget(){
+    // Gentle micro-wobble for life, but position is stable
+    const wobX = Math.sin(Date.now()/260)*1.2;
+    const wobY = Math.cos(Date.now()/310)*1.2;
+    const x = T.x + wobX, y = T.y + wobY, r = T.r;
+
+    const rings = [
+      { r:r+6, c:'#1a1e2c' },
+      { r:r,   c:'#ffffff' },
+      { r:r*0.66, c:'#ff4e73' },
+      { r:r*0.33, c:'#1a1e2c' }
+    ];
+    rings.forEach(({r,c})=>{
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=c; ctx.fill();
+    });
+  }
+
+  // Teleports ONLY at the last moment:
+  // If a dart tip enters the "near-hit band", blink away.
+  const NEAR_HIT_PAD = 22;   // how close to the ring before blinking
+  const PREDICT_STEPS = 2;   // 1-2 frames lookahead makes the blink feel last-second
+
+  function drawDartsAndUpdate(){
+    for(let i=state.darts.length-1;i>=0;i--){
+      const d = state.darts[i];
+
+      // Predict next positions to trigger blink just before impact
+      let willBlink = false;
+      for (let k=0; k<=PREDICT_STEPS; k++){
+        const px = d.x + d.vx * (k+0.5);
+        const py = d.y + d.vy * (k+0.5);
+        const nearBand = T.r + NEAR_HIT_PAD;
+        if (dist(px, py, T.x, T.y) <= nearBand){
+          willBlink = true; break;
+        }
+      }
+
+      if (willBlink){
+        // Move once, then continue dart motion (miss)
+        T.moveToRandom(80);
+        taunt("blink!");
+      }
+
+      // Advance dart
+      d.x += d.vx; d.y += d.vy; d.life++;
+
+      // Draw dart trail and tip
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#e6e7ee';
+      ctx.beginPath();
+      ctx.moveTo(d.x - d.vx*2, d.y - d.vy*2);
+      ctx.lineTo(d.x, d.y);
+      ctx.stroke();
+      ctx.fillStyle = '#e6e7ee';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.tip/2, 0, Math.PI*2);
+      ctx.fill();
+
+      // True hit (extremely rare unless you lower NEAR_HIT_PAD)
+      if (dist(d.x, d.y, T.x, T.y) < T.r*0.8){
+        state.stats.hits++;
+        state.darts.splice(i,1);
+        taunt("okay how did you—");
+        continue;
+      }
+
+      // Out of bounds / expired
+      if (d.x < -20 || d.x > W+20 || d.y < -20 || d.y > H+20 || d.life > d.maxLife){
+        state.stats.misses++;
+        state.darts.splice(i,1);
+      }
+    }
+  }
+
+  function drawCrosshair(){
+    if (!state.cursor.active) return;
+    const x = state.cursor.x, y = state.cursor.y;
+    ctx.save();
+    ctx.globalAlpha = .8;
+    ctx.strokeStyle = '#7c5cff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x,y, 14, 0, Math.PI*2);
+    ctx.moveTo(x-18,y); ctx.lineTo(x+18,y);
+    ctx.moveTo(x,y-18); ctx.lineTo(x,y+18);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function updateHUD(){
+    const s = state.stats;
+    const acc = s.shots ? Math.round((s.hits / s.shots)*100) : 0;
+    accEl.textContent = acc + '%';
+    hitsEl.textContent = s.hits;
+    missEl.textContent = s.misses;
+  }
+
+  function loop(){
+    drawBackground();
+    drawTarget();
+    drawDartsAndUpdate();
+    drawCrosshair();
+    updateHUD();
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  // Keyboard: Space = throw, R = recenter
+  window.addEventListener('keydown', (e)=>{
+    if (e.code === 'Space'){ e.preventDefault(); fire(); }
+    if (e.key.toLowerCase() === 'r'){ T.moveTo(W*0.7, H*0.4); taunt("Target reset"); }
+  }, { passive:false });
+
+})();
+</script>
+</body>
+</html>

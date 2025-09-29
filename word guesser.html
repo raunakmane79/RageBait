@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Guess the Word — But It Glitches 😈</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c10; --panel:#0f121a; --line:#1a2030;
+    --ink:#f3f5fb; --muted:#aab0c0;
+    --good:#7cffb3; --mid:#ffd66e; --bad:#2a3146;
+    --accent:#7c5cff; --warn:#ff4e73;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink);
+    background:radial-gradient(1200px 800px at 20% -10%, #151a26, #0b0c10);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .wrap{
+    width:min(720px, 96vw); background:linear-gradient(180deg,#0f121a,#0b0c10);
+    border:1px solid var(--line); border-radius:18px; padding:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
+  .title{font-weight:900; letter-spacing:.02em}
+  .badge{
+    font-size:.8rem; font-weight:800; padding:6px 10px; border-radius:999px; white-space:nowrap;
+    background:linear-gradient(135deg, var(--accent), #4b89ff);
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .stack{display:flex; flex-direction:column; gap:8px}
+  #board{display:flex; flex-direction:column; gap:8px; margin-top:10px; min-height:210px}
+  .tiles{display:flex; gap:6px; flex-wrap:wrap}
+  .tile{
+    width:40px; height:48px; display:grid; place-items:center; font-weight:900; border-radius:10px;
+    background:#0e1220; border:1px solid var(--line); font-size:1.25rem;
+    transition:transform .15s var(--ease), background .15s var(--ease), border-color .15s var(--ease);
+  }
+  .tile.good{ background:rgba(124,255,179,.12); border-color:rgba(124,255,179,.35) }
+  .tile.mid{  background:rgba(255,214,110,.12); border-color:rgba(255,214,110,.35) }
+  .tile.bad{  background:rgba(42,49,70,.9); border-color:rgba(26,32,48,1) }
+  .hint{color:var(--muted); font-size:.95rem}
+  .controls{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
+  input[type=text].letters{
+    display:flex; gap:8px; border:none; background:transparent; padding:0; margin:0;
+  }
+  .letter{
+    width:48px; height:56px; text-transform:uppercase; text-align:center;
+    background:#0f1322; color:var(--ink); border:1px solid var(--line); border-radius:12px;
+    font-weight:800; font-size:1.3rem; letter-spacing:.06em; outline:none; transition:.2s var(--ease);
+  }
+  .letter:focus{border-color:#43507a; box-shadow:0 0 0 4px rgba(124,92,255,.15)}
+  .btn{
+    padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#0f1322;
+    color:var(--ink); font-weight:800; letter-spacing:.02em; cursor:pointer; transition:.2s var(--ease);
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .btn.primary{ background:linear-gradient(135deg, var(--accent), #4b89ff); border:none }
+  .meta{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px; color:var(--muted)}
+  .pill{padding:6px 10px; border:1px solid var(--line); border-radius:999px}
+  .toast{
+    position:fixed; left:50%; top:16px; transform:translateX(-50%) translateY(-10px);
+    background:#121622; border:1px solid var(--line); color:var(--muted);
+    padding:10px 14px; border-radius:12px; font-weight:800; opacity:0; pointer-events:none;
+    transition:opacity .25s var(--ease), transform .25s var(--ease);
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .glitch{ animation:glitch .4s steps(2) both }
+  @keyframes glitch{
+    0%{transform:translate(0,0)} 30%{transform:translate(-2px,2px)}
+    60%{transform:translate(2px,-1px)} 100%{transform:translate(0,0)}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">Guess the Word — <span style="opacity:.8">Simple… at first</span></div>
+      <div class="badge" id="mode">Normal</div>
+    </header>
+
+    <div class="stack">
+      <div class="hint" id="hint">Guess the hidden word. First 3 guesses are fair. Then the system starts “helping” your spelling 😉</div>
+
+      <!-- Dynamic per-letter inputs -->
+      <div id="letters" class="letters" role="group" aria-label="Enter letters"></div>
+
+      <div class="controls">
+        <button id="submit" class="btn primary">Submit</button>
+        <button id="restart" class="btn">Restart</button>
+        <button id="reveal" class="btn" title="Show the word (for testing)">Peek</button>
+      </div>
+
+      <div class="meta">
+        <span class="pill">Word length: <b id="len">—</b></span>
+        <span class="pill">Guesses: <b id="tries">0</b></span>
+        <span class="pill">Status: <b id="status">Ready</b></span>
+      </div>
+      <div id="board"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">close… but not quite</div>
+
+<script>
+(() => {
+  // Small bank with simple hints (categories)
+  const WORDS = [
+    {w:'apple',h:'fruit'}, {w:'grape',h:'fruit'}, {w:'lemon',h:'fruit'},
+    {w:'mango',h:'fruit'}, {w:'peach',h:'fruit'}, {w:'berry',h:'fruit'},
+    {w:'melon',h:'fruit'}, {w:'olive',h:'fruit/plant'},
+
+    {w:'chair',h:'household item'}, {w:'table',h:'household item'},
+    {w:'spoon',h:'kitchen item'}, {w:'plate',h:'kitchen item'},
+    {w:'glass',h:'kitchen item'}, {w:'phone',h:'gadget'},
+    {w:'mouse',h:'computer accessory'}, {w:'cable',h:'computer accessory'},
+
+    {w:'brick',h:'building material'}, {w:'plant',h:'nature/thing'},
+    {w:'river',h:'nature'}, {w:'beach',h:'place'}, {w:'cloud',h:'sky'},
+    {w:'storm',h:'weather'}, {w:'rainy',h:'weather'}, {w:'sunny',h:'weather'},
+
+    {w:'tiger',h:'animal'}, {w:'zebra',h:'animal'}, {w:'horse',h:'animal'},
+    {w:'sheep',h:'animal'}, {w:'goose',h:'animal'}, {w:'eagle',h:'animal'},
+    {w:'shark',h:'animal'}, {w:'whale',h:'animal'}
+  ]; // 4–6 letters
+
+  const boardEl = document.getElementById('board');
+  const lettersWrap = document.getElementById('letters');
+  const modeEl  = document.getElementById('mode');
+  const submit  = document.getElementById('submit');
+  const restart = document.getElementById('restart');
+  const reveal  = document.getElementById('reveal');
+  const lenEl   = document.getElementById('len');
+  const triesEl = document.getElementById('tries');
+  const statusEl= document.getElementById('status');
+  const toast   = document.getElementById('toast');
+  const hintEl  = document.getElementById('hint');
+
+  let answer = '';      // hidden word
+  let hint   = '';
+  let unfair = false;   // glitch mode
+  let tries = 0;
+  let gameOver = false;
+  let sabotageHistory = new Set(); // track which indices we've sabotaged
+
+  function showToast(t){
+    toast.textContent = t;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toast.classList.remove('show'), 1100);
+  }
+
+  function pickWord(){
+    // Pick only 4–6 letter words
+    const pool = WORDS.filter(o => o.w.length>=4 && o.w.length<=6);
+    const pick = pool[(Math.random()*pool.length)|0];
+    answer = pick.w;
+    hint   = pick.h;
+
+    lenEl.textContent = answer.length;
+    tries = 0; unfair = false; gameOver = false;
+    sabotageHistory.clear();
+    triesEl.textContent = '0';
+    modeEl.textContent = 'Normal';
+    modeEl.style.background = 'linear-gradient(135deg, var(--accent), #4b89ff)';
+    statusEl.textContent = 'Guess away';
+    hintEl.textContent = `Hint: ${hint} • Enter ${answer.length} letters`;
+
+    boardEl.innerHTML = '';
+    lettersWrap.innerHTML = '';
+
+    // Build per-letter inputs
+    for(let i=0;i<answer.length;i++){
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.maxLength = 1;
+      inp.className = 'letter';
+      inp.autocomplete = 'off';
+      inp.setAttribute('aria-label', `Letter ${i+1}`);
+      lettersWrap.appendChild(inp);
+
+      // Auto-advance logic
+      inp.addEventListener('input', e=>{
+        e.target.value = (e.target.value || '').replace(/[^a-zA-Z]/g,'').toUpperCase();
+        if (unfair && Math.random()<0.0) { /* reserved for real-time chaos if desired */ }
+        if (e.target.value && i < answer.length-1){
+          lettersWrap.children[i+1].focus();
+        }
+      });
+      // Backspace to previous
+      inp.addEventListener('keydown', e=>{
+        if (e.key === 'Backspace' && !e.target.value && i>0){
+          lettersWrap.children[i-1].focus();
+        }
+        if (e.key === 'ArrowLeft' && i>0){
+          lettersWrap.children[i-1].focus();
+        }
+        if (e.key === 'ArrowRight' && i<answer.length-1){
+          lettersWrap.children[i+1].focus();
+        }
+        if (e.key === 'Enter'){ onSubmit(); }
+      });
+    }
+    // Focus first box
+    lettersWrap.children[0]?.focus();
+  }
+
+  function getUserGuess(){
+    let s = '';
+    for (let i=0;i<lettersWrap.children.length;i++){
+      s += (lettersWrap.children[i].value || '').toLowerCase();
+    }
+    return s;
+  }
+
+  function setLettersFromString(s){
+    for (let i=0;i<lettersWrap.children.length;i++){
+      lettersWrap.children[i].value = (s[i] || '').toUpperCase();
+    }
+  }
+
+  function feedbackRow(guess, target){
+    const res = new Array(guess.length).fill('bad');
+    const tArr = target.split('');
+    // first pass: exact
+    for (let i=0;i<guess.length;i++){
+      if (guess[i] === tArr[i]){ res[i]='good'; tArr[i]=null; }
+    }
+    // second pass: present elsewhere
+    for (let i=0;i<guess.length;i++){
+      if (res[i]==='good') continue;
+      const idx = tArr.indexOf(guess[i]);
+      if (idx>-1){ res[i]='mid'; tArr[idx]=null; }
+    }
+    return res;
+  }
+
+  function addRow(guess, styles){
+    const row = document.createElement('div');
+    row.className='tiles';
+    for(let i=0;i<guess.length;i++){
+      const t = document.createElement('div');
+      t.className = 'tile ' + (styles[i] || 'bad');
+      t.textContent = (guess[i] || '').toUpperCase();
+      row.appendChild(t);
+    }
+    row.classList.add('glitch');
+    boardEl.appendChild(row);
+    boardEl.scrollTop = boardEl.scrollHeight;
+  }
+
+  function mutateOneIndexDifferent(s, avoidIdx = null){
+    if (!s) return s;
+    let i;
+    // Prefer an index we haven't sabotaged yet, else any
+    const candidates = [...Array(s.length).keys()].filter(k => k !== avoidIdx && !sabotageHistory.has(k));
+    if (candidates.length){
+      i = candidates[(Math.random()*candidates.length)|0];
+    } else {
+      const all = [...Array(s.length).keys()].filter(k => k !== avoidIdx);
+      i = all[(Math.random()*all.length)|0];
+    }
+    let repl = s[i];
+    while (repl === s[i]){
+      repl = String.fromCharCode(97 + ((Math.random()*26)|0));
+    }
+    sabotageHistory.add(i);
+    return {str: s.slice(0,i) + repl + s.slice(i+1), idx:i};
+  }
+
+  function onSubmit(){
+    if (gameOver) return;
+
+    const raw = getUserGuess();
+    if (raw.length !== answer.length || /[^a-z]/.test(raw)){
+      showToast(`enter ${answer.length} letters (A–Z)`); 
+      return;
+    }
+
+    tries++;
+    triesEl.textContent = String(tries);
+
+    // After 3 fair tries, enter Glitch Mode permanently
+    if (!unfair && tries > 3){
+      unfair = true;
+      modeEl.textContent = 'Glitch Mode';
+      modeEl.style.background = 'linear-gradient(135deg, var(--warn), #ffb870)';
+      statusEl.textContent = 'the system “helps” your spelling now';
+      showToast('Glitch Mode: ON');
+    }
+
+    let shownGuess = raw;
+    let checkedGuess = raw;
+
+    if (unfair){
+      // If user typed the real answer (or even a very close one), sabotage exactly one index.
+      const {str: sabotaged, idx} = mutateOneIndexDifferent(raw);
+      shownGuess   = sabotaged;
+      checkedGuess = sabotaged;
+
+      // Reflect sabotage back into the visible input boxes so it feels like boxes changed by themselves
+      setLettersFromString(sabotaged.toUpperCase());
+      showToast(`hmm… letter ${idx+1} looks off`);
+    }
+
+    const styles = feedbackRow(checkedGuess, answer);
+    addRow(shownGuess, styles);
+
+    if (!unfair && raw === answer){
+      statusEl.textContent = 'You win! Enjoy it while it lasts 😅';
+      showToast('Victory!');
+      gameOver = true;
+      return;
+    }
+
+    if (checkedGuess === answer){
+      // In Glitch Mode, never let them win: pretend “almost”
+      statusEl.textContent = 'So close. Keep trying…';
+      showToast('almost.');
+      // keep playing; next submit will sabotage a different box
+    } else {
+      statusEl.textContent = unfair ? 'hmm… something looks off' : 'try again';
+    }
+
+    // Focus first box for quick retype
+    lettersWrap.children[0]?.focus();
+    lettersWrap.children[0]?.select();
+  }
+
+  // Events
+  submit.addEventListener('click', onSubmit);
+  restart.addEventListener('click', pickWord);
+  reveal.addEventListener('click', ()=>{
+    showToast(`(peek) word is "${answer.toUpperCase()}"`);
+  });
+
+  // Initialize
+  pickWord();
+})();
+</script>
+</body>
+</html>

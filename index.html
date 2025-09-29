@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RageBait — All Games</title>
+  <meta name="description" content="RageBait mini-arcade: a hub for every unfair game." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0b0f; --bg2:#10131b; --ink:#f4f4f6; --muted:#c7c7d1; --line:#1a1d27;
+      --accent:#ff5470; --accent2:#7c5cff; --ok:#00d68f; --warn:#ffcb2b; --bad:#ff3b30;
+      --ease:cubic-bezier(.22,.61,.36,1);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      background:linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      overflow-x:hidden; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    header{position:sticky; top:0; z-index:10; backdrop-filter:saturate(140%) blur(10px);
+            background:linear-gradient(180deg, rgba(16,18,27,.85), rgba(16,18,27,.35)); border-bottom:1px solid var(--line)}
+    .nav{max-width:1200px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px}
+    .logo{font-weight:900; letter-spacing:.02em; font-size:1.05rem; display:flex; align-items:center; gap:.6rem}
+    .logo-badge{width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent2)); display:grid; place-items:center; box-shadow:0 6px 18px rgba(124,92,255,.35)}
+    .logo-badge span{font-weight:900; font-size:.9rem}
+    .nav a{color:var(--muted); text-decoration:none; font-weight:600; font-size:.95rem}
+    .nav-cta{padding:10px 14px; background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d;
+      border-radius:12px; font-weight:900; letter-spacing:.02em; box-shadow:0 8px 20px rgba(124,92,255,.25); transition:transform .12s ease}
+    .nav-cta:active{transform:translateY(1px)}
+
+    .hero{position:relative; max-width:1200px; margin:0 auto; padding:8vh 16px 2vh; display:grid; grid-template-columns:1.1fr .9fr; gap:28px; align-items:center}
+    @media (max-width: 900px){ .hero{grid-template-columns:1fr; padding:6vh 16px 1vh} }
+    .kicker{display:inline-flex; gap:.6rem; align-items:center; padding:8px 12px; border:1px dashed #293044; border-radius:999px; color:var(--muted); font-size:.85rem; margin-bottom:14px}
+    .title{font-size:clamp(2.3rem, 5vw, 4.1rem); line-height:1.05; font-weight:900; letter-spacing:-.02em; margin:0 0 10px}
+    .sub{color:var(--muted); font-size:1.05rem; max-width:60ch; margin:10px 0 18px}
+    .cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
+    .cta{padding:14px 18px; border-radius:14px; font-weight:900; letter-spacing:.02em; text-decoration:none; display:inline-flex; align-items:center; gap:.6rem}
+    .cta.primary{background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d; box-shadow:0 10px 28px rgba(124,92,255,.25), inset 0 -2px 0 rgba(0,0,0,.25)}
+    .cta.ghost{border:1px solid #293044; color:var(--muted); backdrop-filter:blur(6px)}
+
+    .controls{max-width:1200px; margin:0 auto; padding:8px 16px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between}
+    .search{flex:1; min-width:230px; position:relative}
+    .search input{width:100%; padding:12px 12px 12px 38px; background:#0e1320; border:1px solid #293044; color:var(--ink); border-radius:12px; outline:none; transition:border-color .2s var(--ease)}
+    .search input:focus{border-color:#3a4564}
+    .search .ico{position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.7}
+    .filters{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{padding:8px 12px; border:1px solid #293044; border-radius:999px; background:#0f1424; color:var(--muted); white-space:nowrap; font-weight:800; font-size:.8rem; cursor:pointer; transition:.18s var(--ease)}
+    .chip.filter.active,.chip.filter:hover{border-color:#3a4564; color:var(--ink)}
+
+    .arcade{max-width:1200px; margin:0 auto; padding:12px 16px 80px}
+    .row-head{display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 14px}
+    .row-head h2{margin:0; font-size:1.25rem; letter-spacing:.01em}
+    .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; perspective:1000px}
+    .card{position:relative; border:1px solid var(--line); border-radius:16px; padding:14px; background:linear-gradient(180deg,#0f1422,#0c1018);
+           box-shadow:0 16px 50px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03); display:flex; flex-direction:column; gap:10px;
+           transition:transform .18s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease); transform-style:preserve-3d; overflow:hidden; opacity:0; transform:translateY(12px) scale(.98);}
+    .card.reveal{opacity:1; transform:translateY(0) scale(1)}
+    .card:hover{ border-color:#2a2f44; box-shadow:0 20px 60px rgba(12,16,24,.55)}
+    .card .gloss{content:""; position:absolute; inset:-1px; background:
+        radial-gradient(350px 200px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.06), transparent 40%);
+        pointer-events:none; mix-blend:screen; transition:opacity .2s var(--ease); opacity:.6}
+    .card-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .card-title{margin:0; font-size:1.05rem; letter-spacing:.01em}
+    .card-text{margin:0; color:var(--muted)}
+    .pill{padding:6px 10px; border:1px solid #293044; border-radius:999px; color:var(--muted)}
+    .actions{display:flex; gap:8px; margin-top:2px; flex-wrap:wrap}
+    .btn{appearance:none; text-decoration:none; cursor:pointer; font-weight:900; letter-spacing:.02em; padding:10px 12px; border-radius:12px; color:#fff; transition:transform .18s var(--ease), filter .2s var(--ease); border:1px solid #293044; background:#0f1322; position:relative; overflow:hidden}
+    .btn.primary{ background:linear-gradient(135deg, var(--accent), var(--accent2)); border:none; box-shadow:0 10px 24px rgba(124,92,255,.25)}
+    .btn.ghost{ color:var(--muted)}
+    .btn:hover{ transform:translateY(-2px)}
+    .btn:active{ transform:translateY(0) scale(.98)}
+    .btn .rip{position:absolute; border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; width:10px; height:10px; opacity:.4; background:rgba(255,255,255,.7); animation:rip .6s ease-out forwards}
+    @keyframes rip{ to{ transform:translate(-50%,-50%) scale(18); opacity:0 } }
+
+    footer{text-align:center; color:var(--muted); padding:18px; border-top:1px solid var(--line); background:#0b0c10}
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="nav">
+      <div class="logo">
+        <div class="logo-badge"><span>RB</span></div>
+        RageBait <span style="opacity:.7">Arcade</span>
+      </div>
+      <a class="nav-cta" href="#games">Play All</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="kicker">⚠️ Unfair on purpose</div>
+      <h1 class="title">All your rage are belong to <span style="background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent">us</span>.</h1>
+      <p class="sub">A single hub for every RageBait mini‑game. They start friendly… then flip the table. Tap a card to play.</p>
+      <div class="cta-row">
+        <a href="#games" class="cta primary">Browse Games ▶</a>
+        <a href="#about" class="cta ghost">What is this?</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <div class="search">
+      <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.2-4.2m1.2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z" stroke="#8a93a9" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="text" placeholder="Search games…" aria-label="Search games" />
+    </div>
+    <div class="filters">
+      <button class="chip filter active" data-filter="all">All</button>
+      <button class="chip filter" data-filter="puzzle">Puzzle</button>
+      <button class="chip filter" data-filter="reflex">Reflex</button>
+      <button class="chip filter" data-filter="classic">Classic</button>
+      <button class="chip filter" data-filter="word">Word</button>
+    </div>
+  </div>
+
+  <section id="games" class="arcade">
+    <div class="row-head"><h2>All Games</h2></div>
+    <div id="grid" class="grid">
+      
+      <article class="card" data-title="🦖 Smooth… then Sus">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🦖 Smooth… then Sus</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Runner that starts fair, then gaslights you.</p>
+        <div class="actions">
+          <a class="btn primary" href="crazydino.html">Play ▶</a>
+          <a class="btn ghost" href="crazydino.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="⏳ RageBait Quiz — Shifty Prompt">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">⏳ RageBait Quiz — Shifty Prompt</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Math timer that mutates mid‑answer.</p>
+        <div class="actions">
+          <a class="btn primary" href="hurrymaths.html">Play ▶</a>
+          <a class="btn ghost" href="hurrymaths.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="🙃 No‑Solution Puzzle">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🙃 No‑Solution Puzzle</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">10 levels of trick questions (Level 7 is cursed).</p>
+        <div class="actions">
+          <a class="btn primary" href="no_solution_puzzle.html">Play ▶</a>
+          <a class="btn ghost" href="no_solution_puzzle.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="⭕ Tic Tac Toe — Impossible">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">⭕ Tic Tac Toe — Impossible</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Looks fair. It isn’t.</p>
+        <div class="actions">
+          <a class="btn primary" href="tictachoe.html">Play ▶</a>
+          <a class="btn ghost" href="tictachoe.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="🧱 Unfair Tetris">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🧱 Unfair Tetris</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Starts normal… then random chaos blocks.</p>
+        <div class="actions">
+          <a class="btn primary" href="unfair%20tetris.html">Play ▶</a>
+          <a class="btn ghost" href="unfair%20tetris.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="🎯 RageBait Darts — Sudden Blink">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🎯 RageBait Darts — Sudden Blink</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Target stays still—until your dart flies.</p>
+        <div class="actions">
+          <a class="btn primary" href="UnfairArrows.html">Play ▶</a>
+          <a class="btn ghost" href="UnfairArrows.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="🕹️ Unfair Atari — Retro Paddle Rage">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🕹️ Unfair Atari — Retro Paddle Rage</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">Pong‑like that cheats after a while.</p>
+        <div class="actions">
+          <a class="btn primary" href="unfairattari.html">Play ▶</a>
+          <a class="btn ghost" href="unfairattari.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+      <article class="card" data-title="🔤 Guess the Word — It Glitches">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🔤 Guess the Word — It Glitches</h3>
+          <span class="pill">Unfair</span>
+        </div>
+        <p class="card-text">First few guesses help you. Then it ‘helps’.</p>
+        <div class="actions">
+          <a class="btn primary" href="word%20guesser.html">Play ▶</a>
+          <a class="btn ghost" href="word%20guesser.html" target="_blank" rel="noopener">Open in new tab ↗</a>
+        </div>
+      </article>
+    
+    </div>
+  </section>
+
+  <section id="about" class="arcade" style="padding-top:0">
+    <div class="row-head"><h2>About</h2></div>
+    <p class="card-text">RageBait is a tiny arcade where each game is designed to <em>feel</em> fair at first—then mischievously tip the board. Great for friendly dares and testing your calm 🙂</p>
+  </section>
+
+  <footer>Built with love and a little evil. Good luck.</footer>
+
+<script>
+  // Card reveal + glossy follow
+  const cards = [...document.querySelectorAll('.card')];
+  const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('reveal')), {threshold:.08});
+  cards.forEach(c => io.observe(c));
+  cards.forEach(card => card.addEventListener('pointermove', e => {
+    const r = card.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) / r.width) * 100;
+    const my = ((e.clientY - r.top) / r.height) * 100;
+    card.style.setProperty('--mx', mx + '%');
+    card.style.setProperty('--my', my + '%');
+  }));
+
+  // Click ripple on all .btn
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.btn'); if(!b) return;
+    const r = b.getBoundingClientRect();
+    const d = document.createElement('span'); d.className='rip';
+    d.style.left = (e.clientX - r.left) + 'px'; d.style.top = (e.clientY - r.top) + 'px';
+    b.appendChild(d); setTimeout(() => d.remove(), 650);
+  });
+
+  // Simple search + filters (by title keywords & rough tags)
+  const Q = document.getElementById('q');
+  const filters = [...document.querySelectorAll('.filter')];
+  let active = 'all';
+  filters.forEach(f => f.addEventListener('click', () => {
+    filters.forEach(x => x.classList.remove('active')); f.classList.add('active');
+    active = f.dataset.filter; apply();
+  }));
+  Q.addEventListener('input', apply);
+
+  function apply(){
+    const q = Q.value.trim().toLowerCase();
+    for(const card of cards){
+      const title = (card.dataset.title || '').toLowerCase();
+      let ok = !q || title.includes(q);
+      if(active !== 'all'){
+        const tag = tagFor(title);
+        ok = ok && (tag === active);
+      }
+      card.style.display = ok ? '' : 'none';
+    }
+  }
+
+  function tagFor(title){
+    if(title.includes('word')) return 'word';
+    if(title.includes('puzzle') || title.includes('tic tac toe')) return 'puzzle';
+    if(title.includes('tetris')) return 'classic';
+    if(title.includes('atari')) return 'classic';
+    if(title.includes('darts') || title.includes('runner') || title.includes('sus')) return 'reflex';
+    return 'all';
+  }
+
+  // Scroll to games if hash present
+  if(location.hash === '#games'){ document.getElementById('games').scrollIntoView({behavior:'smooth'}); }
+</script>
+</body>
+</html>

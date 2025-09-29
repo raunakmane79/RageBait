@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RageBait — All Games</title>
+  <meta name="description" content="RageBait mini-arcade: a hub for every unfair game." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0b0f; --bg2:#10131b; --ink:#f4f4f6; --muted:#c7c7d1; --line:#1a1d27;
+      --accent:#ff5470; --accent2:#7c5cff; --ok:#00d68f; --warn:#ffcb2b; --bad:#ff3b30;
+      --ease:cubic-bezier(.22,.61,.36,1);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      background:linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      overflow-x:hidden; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    #fx-canvas{position:fixed; inset:0; z-index:-1; display:block}
+    .scanlines{position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.05; background:repeating-linear-gradient(180deg,#000 0 1px,transparent 1px 3px)}
+    .blob{position:fixed; width:60vmax; height:60vmax; filter:blur(50px); opacity:.22; border-radius:50%;
+      background:radial-gradient(circle at 30% 30%, var(--accent), transparent 40%),
+                 radial-gradient(circle at 70% 70%, var(--accent2), transparent 40%);
+      animation: float 18s var(--ease) infinite alternate;
+      z-index: -1; pointer-events:none}
+    .blob.b2{left:-15vmax; bottom:-10vmax; animation-duration:22s}
+    .blob.b1{right:-20vmax; top:-15vmax; animation-duration:26s}
+    @keyframes float{to{transform:translate3d(0, -4vh, 0) scale(1.07)}}
+
+    header{position:sticky; top:0; z-index:10; backdrop-filter:saturate(140%) blur(10px);
+            background:linear-gradient(180deg, rgba(16,18,27,.85), rgba(16,18,27,.35)); border-bottom:1px solid var(--line)}
+    .nav{max-width:1200px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px}
+    .logo{font-weight:900; letter-spacing:.02em; font-size:1.05rem; display:flex; align-items:center; gap:.6rem}
+    .logo-badge{width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent2)); display:grid; place-items:center; box-shadow:0 6px 18px rgba(124,92,255,.35)}
+    .logo-badge span{font-weight:900; font-size:.9rem}
+    .nav a{color:var(--muted); text-decoration:none; font-weight:600; font-size:.95rem}
+    .nav-cta{padding:10px 14px; background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d;
+      border-radius:12px; font-weight:900; letter-spacing:.02em; box-shadow:0 8px 20px rgba(124,92,255,.25); transition:transform .12s ease}
+    .nav-cta:active{transform:translateY(1px)}
+
+    .hero{position:relative; max-width:1200px; margin:0 auto; padding:8vh 16px 3vh; display:grid; grid-template-columns:1.1fr .9fr; gap:28px; align-items:center}
+    @media (max-width: 900px){ .hero{grid-template-columns:1fr; padding:7vh 16px 2vh} }
+    .kicker{display:inline-flex; gap:.6rem; align-items:center; padding:8px 12px; border:1px dashed #293044; border-radius:999px; color:var(--muted); font-size:.85rem; margin-bottom:14px}
+    .title{font-size:clamp(2.3rem, 5vw, 4.1rem); line-height:1.05; font-weight:900; letter-spacing:-.02em; margin:0 0 10px}
+    .sub{color:var(--muted); font-size:1.05rem; max-width:60ch; margin:10px 0 18px}
+    .cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
+    .cta{padding:14px 18px; border-radius:14px; font-weight:900; letter-spacing:.02em; text-decoration:none; display:inline-flex; align-items:center; gap:.6rem}
+    .cta.primary{background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#0a0a0d; box-shadow:0 10px 28px rgba(124,92,255,.25), inset 0 -2px 0 rgba(0,0,0,.25)}
+    .cta.ghost{border:1px solid #293044; color:var(--muted); backdrop-filter:blur(6px)}
+
+    .controls{max-width:1200px; margin:0 auto; padding:8px 16px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between}
+    .search{flex:1; min-width:230px; position:relative}
+    .search input{width:100%; padding:12px 12px 12px 38px; background:#0e1320; border:1px solid #293044; color:var(--ink); border-radius:12px; outline:none; transition:border-color .2s var(--ease)}
+    .search input:focus{border-color:#3a4564}
+    .search .ico{position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.7}
+    .filters{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{padding:8px 12px; border:1px solid #293044; border-radius:999px; background:#0f1424; color:var(--muted); white-space:nowrap; font-weight:800; font-size:.8rem; cursor:pointer; transition:.18s var(--ease)}
+    .chip.filter.active,.chip.filter:hover{border-color:#3a4564; color:var(--ink)}
+
+    .arcade{max-width:1200px; margin:0 auto; padding:12px 16px 80px}
+    .row-head{display:flex; align-items:center; justify-content:space-between; gap:16px; margin:8px 0 14px}
+    .row-head h2{margin:0; font-size:1.25rem; letter-spacing:.01em}
+    .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; perspective:1000px}
+    .card{position:relative; border:1px solid var(--line); border-radius:16px; padding:14px; background:linear-gradient(180deg,#0f1422,#0c1018);
+           box-shadow:0 16px 50px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.03); display:flex; flex-direction:column; gap:10px;
+           transition:transform .18s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease); transform-style:preserve-3d; overflow:hidden; opacity:0; transform:translateY(12px) scale(.98);}
+    .card.reveal{opacity:1; transform:translateY(0) scale(1)}
+    .card:hover{ border-color:#2a2f44; box-shadow:0 20px 60px rgba(12,16,24,.55)}
+    .card .gloss{content:""; position:absolute; inset:-1px; background:
+        radial-gradient(350px 200px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.06), transparent 40%);
+        pointer-events:none; mix-blend:screen; transition:opacity .2s var(--ease); opacity:.6}
+    .card-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .card-title{margin:0; font-size:1.05rem; letter-spacing:.01em}
+    .card-text{margin:0; color:var(--muted)}
+    .actions{display:flex; gap:8px; margin-top:2px; flex-wrap:wrap}
+    .btn{appearance:none; text-decoration:none; cursor:pointer; font-weight:900; letter-spacing:.02em; padding:10px 12px; border-radius:12px; color:#fff; transition:transform .18s var(--ease), filter .2s var(--ease); border:1px solid #293044; background:#0f1322; position:relative; overflow:hidden}
+    .btn.primary{ background:linear-gradient(135deg, var(--accent), var(--accent2)); border:none; box-shadow:0 10px 24px rgba(124,92,255,.25)}
+    .btn.ghost{ color:var(--muted)}
+    .btn:hover{ transform:translateY(-2px)}
+    .btn:active{ transform:translateY(0) scale(.98)}
+    .btn .rip{position:absolute; border-radius:50%; transform:translate(-50%,-50%); pointer-events:none; width:10px; height:10px; opacity:.4; background:rgba(255,255,255,.7); animation:rip .6s ease-out forwards}
+    @keyframes rip{ to{opacity:0; transform:translate(-50%,-50%) scale(20)} }
+
+    dialog::backdrop{background:rgba(0,0,0,.6)}
+    dialog{border:none; border-radius:16px; padding:0; overflow:hidden; max-width:92vw; width:900px; box-shadow:0 24px 80px rgba(0,0,0,.6)}
+    .modal-head{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line); background:#0f1118}
+    .modal-title{font-weight:900}
+    .modal-close{background:transparent; color:var(--muted)}
+    .modal-wrap{position:relative}
+    .spinner{position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,#0d0f15,#0b0c12)}
+    .spinner .dot{width:10px; height:10px; border-radius:50%; background:var(--accent); animation:bounce 1.1s infinite alternate; box-shadow:0 0 24px rgba(255,84,112,.6)}
+    @keyframes bounce{to{transform:translateY(-14px)}}
+    iframe{display:block; width:900px; height:70vh; background:#0a0a0d}
+    @media (max-width: 950px){ iframe{width:92vw} }
+
+    .ragebar{height:8px; background:#121621; border-top:1px solid #22283a; border-bottom:1px solid #0a0c12; position:relative}
+    .ragebar .fill{position:absolute; inset:0; width:8%; background:linear-gradient(90deg, var(--bad), var(--accent)); box-shadow:0 0 22px rgba(255,84,112,.35) inset; transition:width .25s var(--ease)}
+  </style>
+</head>
+<body>
+  <canvas id="fx-canvas"></canvas>
+  <div class="scanlines"></div>
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+
+  <header>
+    <nav class="nav">
+      <div class="logo">
+        <div class="logo-badge"><span>RB</span></div>
+        RageBait — Mini-Arcade
+      </div>
+      <a class="nav-cta" href="/mnt/data/ragebait-landing-pro.html" target="_blank" rel="noopener">Original landing →</a>
+    </nav>
+    <div class="ragebar"><div class="fill" id="ragefill"></div></div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="kicker"><i style="display:inline-block;width:8px;height:8px;background:var(--bad);border-radius:50%;box-shadow:0 0 14px var(--bad)"></i> Unfair by design</div>
+      <h1 class="title">All RageBait games in one place.</h1>
+      <p class="sub">Filters. Search. 3D tilt cards. Live effects. Use <b>Preview</b> for a quick in-page peek or hit <b>Play</b> to go full screen.</p>
+      <div class="cta-row">
+        <a href="#arcade" class="cta primary">Browse Games ↓</a>
+        <a href="/mnt/data/ragebait-landing-pro.html" target="_blank" class="cta ghost">Previous landing</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <div class="search">
+      <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35M4 11a7 7 0 1 0 14 0 7 7 0 0 0-14 0Z" stroke="currentColor" opacity=".6" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" placeholder="Search games… (title, description)" spellcheck="false"/>
+    </div>
+    <div class="filters">
+      <button class="chip filter" data-filter="all">All</button><button class="chip filter" data-filter="platformer">Platformer</button><button class="chip filter" data-filter="quiz">Quiz</button><button class="chip filter" data-filter="puzzle">Puzzle</button><button class="chip filter" data-filter="board">Board</button><button class="chip filter" data-filter="arcade">Arcade</button><button class="chip filter" data-filter="skill">Skill</button><button class="chip filter" data-filter="word">Word</button>
+    </div>
+  </div>
+
+  <section id="arcade" class="arcade">
+    <div class="row-head"><h2>All Games</h2></div>
+    <div class="grid" id="grid">
+      
+      <article class="card" data-tag="platformer">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🦖 Smooth… then Sus (Dino Runner)</h3>
+          <span class="chip">Platformer</span>
+        </div>
+        <p class="card-text">Starts fair, then the floor betrays you.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/crazydino.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/crazydino.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="quiz">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">⏳ RageBait Quiz — Shifty Prompt</h3>
+          <span class="chip">Quiz</span>
+        </div>
+        <p class="card-text">Answer fast, but the question keeps changing.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/hurrymaths.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/hurrymaths.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="puzzle">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🙃 No-Solution Puzzle — 10 Levels</h3>
+          <span class="chip">Puzzle</span>
+        </div>
+        <p class="card-text">Levels 1–6 tease you. Level 7? Impossible.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/no_solution_puzzle.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/no_solution_puzzle.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="board">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">❌ Tic Tac Toe — Impossible to Win</h3>
+          <span class="chip">Board</span>
+        </div>
+        <p class="card-text">Looks normal. CPU refuses to lose.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/tictachoe.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/tictachoe.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="arcade">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🧱 Unfair Tetris — Starts Fair, Ends Evil</h3>
+          <span class="chip">Arcade</span>
+        </div>
+        <p class="card-text">Gravity is fine… until it isn’t.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/unfair%20tetris.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/unfair%20tetris.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="skill">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🎯 RageBait Darts — Sudden Blink</h3>
+          <span class="chip">Skill</span>
+        </div>
+        <p class="card-text">Target stays put… right until you throw.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/UnfairArrows.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/UnfairArrows.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="arcade">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🕹️ Unfair Atari — Retro Paddle Rage</h3>
+          <span class="chip">Arcade</span>
+        </div>
+        <p class="card-text">Pong-esque fun that turns on you.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/unfairattari.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/unfairattari.html">Preview</button>
+        </div>
+      </article>
+    
+      <article class="card" data-tag="word">
+        <div class="gloss"></div>
+        <div class="card-top">
+          <h3 class="card-title">🔤 Guess the Word — But It Glitches</h3>
+          <span class="chip">Word</span>
+        </div>
+        <p class="card-text">Spelling gaslights you after a few tries.</p>
+        <div class="actions">
+          <a class="btn primary ripple" href="/mnt/data/word%20guesser.html" target="_blank" rel="noopener">Play →</a>
+          <button class="btn ghost ripple" data-preview="/mnt/data/word%20guesser.html">Preview</button>
+        </div>
+      </article>
+    
+    </div>
+  </section>
+
+  <dialog id="modal">
+    <div class="modal-head">
+      <div class="modal-title">Preview</div>
+      <button class="btn modal-close ripple">Close</button>
+    </div>
+    <div class="modal-wrap">
+      <div class="spinner" id="spin"><div class="dot"></div></div>
+      <iframe id="frame" src="about:blank"></iframe>
+    </div>
+  </dialog>
+
+  <script>
+    /* ---------- Canvas particles (lightweight) ---------- */
+    const C = document.getElementById('fx-canvas');
+    const X = C.getContext('2d');
+    let W = C.width = innerWidth, H = C.height = innerHeight;
+    const P = Array.from({length: 60}, () => ({ 
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*2 + .6, vx: (Math.random()-.5)*.2, vy: (Math.random()-.5)*.2, a: Math.random()*1
+    }));
+    function draw(){ 
+      X.clearRect(0,0,W,H);
+      X.globalCompositeOperation = 'lighter';
+      for (const p of P){ 
+        p.x += p.vx; p.y += p.vy; p.a += 0.004;
+        if (p.x< -10) p.x=W+10; if (p.x>W+10) p.x=-10;
+        if (p.y< -10) p.y=H+10; if (p.y>H+10) p.y=-10;
+        X.beginPath(); X.arc(p.x,p.y,p.r,0,Math.PI*2);
+        X.fillStyle = `rgba(124,92,255,${0.05+0.15*Math.sin(p.a)})`; X.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+    addEventListener('resize', () => { W = C.width = innerWidth; H = C.height = innerHeight; });
+    draw();
+
+    /* ---------- Reveal on scroll ---------- */
+    const cards = Array.from(document.querySelectorAll('.card'));
+    const obs = new IntersectionObserver((entries)=>{
+      for (const e of entries) if (e.isIntersecting) e.target.classList.add('reveal');
+    }, { threshold: .1 });
+    cards.forEach(c=>obs.observe(c));
+
+    /* ---------- 3D tilt + gloss ---------- */
+    cards.forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        const x = e.clientX - r.left, y = e.clientY - r.top;
+        const rx = ((y/r.height)-.5)*-6, ry = ((x/r.width)-.5)*6;
+        card.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(-2px)`;
+        card.style.setProperty('--mx', x+'px'); card.style.setProperty('--my', y+'px');
+      });
+      card.addEventListener('mouseleave', () => card.style.transform = '');
+    });
+
+    /* ---------- Ripple on buttons ---------- */
+    function addRipple(e) {
+      const btn = e.currentTarget;
+      const r = btn.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const s = document.createElement('span');
+      s.className='rip'; s.style.left = x+'px'; s.style.top = y+'px';
+      btn.appendChild(s);
+      setTimeout(() => s.remove(), 650);
+    }
+    document.querySelectorAll('.ripple').forEach(b => b.addEventListener('click', addRipple));
+
+    /* ---------- Modal preview with spinner ---------- */
+    const modal = document.getElementById('modal');
+    const frame = document.getElementById('frame');
+    const spin  = document.getElementById('spin');
+    const closeBtn = modal.querySelector('.modal-close');
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-preview]');
+      if (btn) {
+        const url = btn.getAttribute('data-preview');
+        spin.style.display='grid'; frame.src='about:blank';
+        modal.showModal();
+        setTimeout(() => { frame.src = url; }, 120);
+      }
+    });
+    frame.addEventListener('load', () => spin.style.display='none');
+    closeBtn.addEventListener('click', () => modal.close());
+    modal.addEventListener('click', (e) => {
+      const rect = modal.getBoundingClientRect();
+      if (e.clientY < rect.top || e.clientY > rect.bottom ||
+          e.clientX < rect.left || e.clientX > rect.right) modal.close();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.open) modal.close(); });
+
+    /* ---------- Filters + search ---------- */
+    const filterChips = Array.from(document.querySelectorAll('.chip.filter'));
+    const search = document.getElementById('q');
+    let currentFilter = 'all';
+
+    function applyFilters() {
+      const q = (search.value || '').toLowerCase().trim();
+      for (const c of cards) {
+        const tag = c.dataset.tag;
+        const text = (c.innerText || '').toLowerCase();
+        const tagOk = currentFilter === 'all' || tag === currentFilter;
+        const textOk = !q || text.includes(q);
+        const show = tagOk && textOk;
+        c.style.display = show ? 'flex' : 'none';
+      }
+    }
+    filterChips.forEach(ch => ch.addEventListener('click', () => {
+      filterChips.forEach(x => x.classList.remove('active'));
+      ch.classList.add('active');
+      currentFilter = ch.dataset.filter;
+      applyFilters();
+    }));
+    search.addEventListener('input', applyFilters);
+    const first = document.querySelector('.chip.filter[data-filter="all"]');
+    first && first.classList.add('active');
+
+    /* ---------- Rage meter: grows as you hover cards ---------- */
+    const ragefill = document.getElementById('ragefill');
+    let rage = 8;
+    cards.forEach(c => c.addEventListener('mouseenter', () => {
+      rage = Math.min(100, rage + 3);
+      ragefill.style.width = rage + '%';
+      setTimeout(() => {
+        rage = Math.max(8, rage - 1.5);
+        ragefill.style.width = rage + '%';
+      }, 1600);
+    }));
+  </script>
+</body>
+</html>
